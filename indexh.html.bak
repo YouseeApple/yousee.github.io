@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title>電腦版刮刮履歷</title>
+		<style type="text/css">
+			#c1{
+				border: 1px solid white;
+				position: absolute;
+			}
+			
+			#c2{
+				border: 1px solid white;
+			}
+			
+			body{
+				position: relative;
+			}
+		</style>
+	</head>
+	<body>
+		
+		<canvas id="c1" width="3000" height="5000"></canvas>
+		
+		<canvas id="c2" width="3000" height="5000"></canvas>
+		
+	</body>
+	<script type="text/javascript">
+		var c1 = document.getElementById("c1");
+		var c2 = document.getElementById("c2");
+		
+		var ctx1 = c1.getContext("2d");
+		var ctx2 = c2.getContext("2d");
+		
+		
+		// 將完整履歷放到下層  canvas2
+		var imgs = new Image();
+		imgs.src = 'img/after.jpg';
+		imgs.onload = function(){
+			ctx2.drawImage(this,0,0)
+		}
+		
+		// 需要刮的履歷放在上層  canvas1
+		var img2 = new Image();
+		img2.src = 'img/before.jpg';
+		img2.onload = function(){
+			ctx1.drawImage(this,0,0)
+		}
+		
+		// 監聽canvas的onmousedown事件
+		c1.onmousedown = function(ev){
+		c1.onmousemove = function(e){
+			console.log(e);
+			var w = 50;			// 清除筆刷的寬度
+			var h = 50;			// 清除筆刷的高度
+			var x = e.pageX-c1.offsetLeft - w/2;    // 清除筆刷的x位置
+			var y = e.pageY-c1.offsetTop - h/2;		// 清除筆刷的y位置
+			ctx1.clearRect(x,y,w,h);
+		}
+		}
+		c1.onmouseup = function(ev){
+		// 取消onmousemove事件
+		c1.onmousemove = null;
+		}
+
+	</script>
+</html>
