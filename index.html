@@ -17,13 +17,13 @@
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net http://127.0.0.1:11434 http://localhost:11434 http://127.0.0.1:8000 http://127.0.0.1:8000;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
   ">
   <title>語音卡片筆記-語音轉文字Linebot</title>
-  <meta name="description" content="語音卡片筆記：透過 LINE 官方帳號即可使用的語音轉文字筆記工具。支援錄音、共享 Google Sheet 筆記、AI 摘要（中英日韓混雜語音辨識），不用另外安裝 App，加好友就能用。">
+  <meta name="description" content="語音卡片筆記：免登入、免加好友，開啟即用的語音轉文字筆記工具。支援錄音、共享 Google Sheet 筆記、AI 摘要，辨識與摘要可在 Groq／Gemini 雲端與本機 Ollama 之間切換，不用另外安裝 App。">
 
   <!-- Open Graph：讓 LINE /社群分享連結時顯示正確標題與描述。
        不加 canonical／結構化資料：頁面有 LIFF 登入閘門
@@ -32,7 +32,7 @@
   <meta property="og:site_name" content="語音卡片筆記">
   <meta property="og:locale" content="zh_TW">
   <meta property="og:title" content="語音卡片筆記-語音轉文字Linebot">
-  <meta property="og:description" content="用 LINE 就能錄音、記筆記、AI 摘要，一鍵完成，不用安裝其他 App。">
+  <meta property="og:description" content="免登入就能錄音、記筆記、AI 摘要，一鍵完成，不用安裝其他 App。支援本機 Ollama。">
   <meta property="og:url" content="https://www.globalesprit.com/meetred/">
   <style>
     :root {
@@ -48,11 +48,30 @@
       --danger: #e0393e;
       --warn-bg: #fff8e6;
       --warn-border: #f0c96a;
+      /* RWD：內容最大寬度隨螢幕級距放大，.app／.action-bar 共用此變數 */
+      --app-max: 480px;
     }
     * { box-sizing: border-box; }
     .hidden { display: none !important; }
     body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Segoe UI", Roboto, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--ink); }
-    .app { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+    .app { max-width: var(--app-max); margin: 0 auto; min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+    /* RWD 斷點：手機維持 480px 單欄；平板放寬到 720px；
+       桌機放寬到 960px 且設定區改雙欄；大螢幕再放寬到 1100px */
+    @media (min-width: 600px) {
+      :root { --app-max: 720px; }
+      main { padding: 20px 24px 110px; }
+    }
+    @media (min-width: 960px) {
+      :root { --app-max: 960px; }
+      main { padding: 24px 32px 110px; }
+      .zone-panels { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; align-items: start; }
+      .zone-panels .key-panel { margin-bottom: 16px; }
+      .mindmap-svg { height: 420px; }
+      .modal-box { max-width: 560px; }
+    }
+    @media (min-width: 1280px) {
+      :root { --app-max: 1100px; }
+    }
     header { padding: 18px 16px 14px; background: var(--card-bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
     header h1 { font-size: 15px; margin: 0 0 3px; font-weight: 700; }
     header .sub { font-size: 12px; color: var(--ink-soft); }
@@ -102,6 +121,28 @@
       font-size: 12.5px; padding: 0 14px; border-radius: 10px; cursor: pointer;
     }
     .keypool-count-hint { font-size: 11px; color: var(--ink-faint); margin-top: 6px; }
+
+    /* 設定頁服務分區：目前使用中的服務切換列＋伺服器共用按鈕列 */
+    .provider-switch-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 12px; padding: 10px 12px; margin-bottom: 12px;
+    }
+    .provider-switch-label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+    .provider-switch-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+    .provider-switch-btns button {
+      padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--ink-soft); border-radius: 999px; cursor: pointer;
+    }
+    .provider-switch-btns button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .server-sync-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .server-sync-row button {
+      flex: 1; min-width: 120px; padding: 10px; font-size: 12.5px;
+      font-weight: 700; border-radius: 10px; cursor: pointer;
+    }
+    .btn-sync-load { border: 1px solid var(--line-green); background: var(--line-green-tint); color: var(--line-green-dark); }
+    .btn-sync-save { border: none; background: var(--line-green); color: #fff; }
+    .btn-sync-dl { border: 1px solid var(--border); background: var(--card-bg); color: var(--ink-soft); }
 
     .keypool-switch-mode-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -375,7 +416,7 @@
     .cards { display: flex; flex-direction: column; gap: 8px; }
     .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; justify-content: space-between; align-items: center; }
     .card-text { font-size: 14.5px; line-height: 1.5; color: var(--ink); word-break: break-word; }
-    .action-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 16px 16px; }
+    .action-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--app-max); background: linear-gradient(to top, var(--bg) 60%, transparent); padding: 20px 16px 16px; }
     .share-option {
       padding: 12px; border: 1px solid var(--border); border-radius: 10px;
       margin-bottom: 8px; cursor: pointer; transition: background 0.15s;
@@ -391,7 +432,7 @@
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-    /* 主導覽 5 分頁列，sticky 固定頂部，切分頁不需重新捲動 */
+    /* 主導覽 6 分頁列，sticky 固定頂部，切分頁不需重新捲動 */
     .main-tabs {
       display: flex; position: sticky; top: 0; z-index: 9;
       background: var(--card-bg); border-bottom: 1px solid var(--border);
@@ -575,6 +616,25 @@
     }
     .summary-actions-inline button.del:hover { background: #fdeaea; color: var(--danger); }
     .summary-actions-inline button.share:hover { background: var(--line-green-tint); color: var(--line-green-dark); }
+    /* 防呆：沒摘要時操作按鈕停用，避免點了沒反應 */
+    .summary-actions-inline button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .translate-row select:disabled { opacity: 0.5; }
+    .translate-row .keypool-add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .translate-hint { font-size: 11.5px; color: var(--ink-faint); }
+
+    /* 摘要翻譯列：語言下拉＋翻譯按鈕；譯文輸出沿用 .summary-output 外觀 */
+    .translate-row {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+    }
+    .translate-row.hidden { display: none; }
+    .translate-row select {
+      border: 1px solid var(--border); border-radius: 8px; background: var(--bg);
+      padding: 7px 8px; font-size: 12.5px; color: var(--ink); font-weight: 600;
+    }
+    .translate-row .keypool-add-btn { padding: 8px 14px; font-size: 12.5px; }
+    .translate-actions-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+    .translate-actions-row.hidden { display: none; }
 
     .shared-notes-panel {
       background: var(--card-bg); border: 1px dashed var(--border); border-radius: 14px;
@@ -763,6 +823,18 @@
   <script defer src="https://cdn.jsdelivr.net/npm/markmap-view@0.18.10/dist/browser/index.js"
           integrity="sha256-ESWcb69+MMnx0DK25aF3WmF3TAQU61ZRoPtKjtObNVs="
           crossorigin="anonymous"></script>
+  <!--
+    文件翻譯用：pdf.js（v3 UMD，在瀏覽器本機解析 PDF 文字層）＋
+    mammoth（DOCX 轉純文字）。版本鎖定＋SRI，避免上游改版出事。
+    pdf.js 的 worker 透過 workerSrc 指定同版本 CDN（worker 不走 SRI，
+    且 CSP 的 script-src 已放行 cdn.jsdelivr.net）。
+  -->
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"
+          integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e"
+          crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mammoth@1.9.1/mammoth.browser.min.js"
+          integrity="sha384-Dmql2RDFhRnFI5K9k2OlF+n+0KL1nR4scY5Akjy8jw8GEbmChSzpsB6Q4Mv+xF0L"
+          crossorigin="anonymous"></script>
 </head>
 <body>
   <!-- 首次進站提示彈窗：兩頁（注意事項／更新內容），關閉後記住已讀版本，
@@ -777,19 +849,61 @@
         <div id="modalNoticeContent">
           <h4>開始使用前，請先知道這些事</h4>
           <ul style="padding-left:18px; margin:0;">
-            <li>需要自己申請 Groq API Key 才能使用（免費，見下方輸入框旁的教學連結）</li>
+            <li>語音辨識可用「Groq 雲端」（免費，需自備 API Key，見設定分頁教學）、「本機 Ollama」或「地端 Faster-Whisper」（後兩者免 Key，位址與模型在「🎙️ 語音辨識服務」設定區各自設定）</li>
             <li><b>API Key 會存在這台裝置的瀏覽器裡</b>。如果這是公用或跟別人共用的裝置（例如公司電腦、借用的手機），請在下方「共用裝置」區塊清除資料，或使用完畢後手動清除，避免下一個使用者看到你的 Key 與筆記內容</li>
             <li>錄音轉成文字後，<b>原始音檔不會被保留</b>，只留文字卡片。如需留底請另外用手機錄音 App 同時錄一份</li>
-            <li>轉寫過程會將這段音訊上傳到 Groq 的伺服器處理，語音內容不是完全留在你手機本機</li>
+            <li>轉寫過程會將這段音訊上傳到<b>你所選的辨識服務</b>處理（Groq 雲端，或你指定的 Ollama／Faster-Whisper 位址）；位址就是自己電腦時，語音不會離開本機</li>
             <li>每 15 秒會自動切一段送出轉寫，句子剛好跨越切段點時可能被拆成兩張卡片，屬已知限制</li>
             <li><b>整理好的語音卡片會自動儲存在這台裝置的瀏覽器裡</b>，就算不小心切出去、誤觸上一頁或重新整理，回來也找得回來；但這也代表若為共用裝置，請務必在使用完畢後於 API Key 卡片內點「清除本機資料」，避免下一位使用者看到你的內容</li>
-            <li>發送功能有三種：「送回聊天室」直接存回你打開此頁面時所在的聊天室（僅限從 LINE 聊天室進入時可用，最推薦）；「LINE 好友選單」需要先登入 LINE 才能選對象發送；「手機分享」在 LINE 內開啟時會自動改走好友選單（LINE 內建瀏覽器對系統分享有限制）</li>
+            <li>發送功能有三種：「送回聊天室」僅在 LINE 聊天室內開啟時可用；「LINE 好友分享」同樣只在 LINE 環境可用（兩者皆為可選）；「手機分享／複製」在一般瀏覽器即可使用，<b>全程不需要登入</b>；在 LINE 內開啟時系統分享會自動改走好友選單（LINE 內建瀏覽器限制）</li>
             <li>「查看共享筆記」是唯讀功能，只能讀取別人貼在共用 Google Sheet 裡的內容（可勾選多筆、與自己的語音卡片混合，一起生成摘要），不會寫回 Sheet；要把自己整理好的內容或生成好的摘要加進 Sheet，需使用「複製成 Sheet 貼上格式」／「存回 Sheet」按鈕複製後自行手動貼上</li>
           </ul>
         </div>
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>辨識與翻譯新增德文</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>「辨識語言」新增<b>德文</b>選項，可固定鎖定整場錄音；「自動」模式同步認得德文（中英日韓德混雜），偵測到自動鎖定 60 秒</li>
+              <li>摘要「🌐 翻譯」與文件「🌐 翻譯成」的目標語言同步新增 <b>Deutsch</b></li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>新增📄文件分頁：上傳 PDF／DOCX 翻譯</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>新增第 6 個分頁<b>「📄 文件」</b>：上傳 PDF（需有文字層）或 DOCX，選中英日韓德一種語言，一鍵翻譯，譯文可複製／下載／清除</li>
+              <li>檔案解析全在<b>本機瀏覽器</b>做（pdf.js／mammoth，不上傳）；翻譯共用摘要服務的設定（Gemini／Ollama），長文件自動按段落切段逐段翻並顯示進度</li>
+              <li>辨識的「🎯 地端 Faster-Whisper」追加支援 <b>whisper.cpp（whisper-server）的 <code>/inference</code></b>：轉寫依序試 <code>/v1/audio/transcriptions</code> → <code>/asr</code> → <code>/inference</code>，打 whisper.cpp 會自動轉成 16k WAV 再送；「測試連線」也認得 whisper.cpp，不會再誤報失敗</li>
+              <li>修正「從伺服器載入」遇到空 Key 池就整份報錯的問題：現在空池自動略過、本機保留原值，有用的服務設定照樣套用；兩邊都空才會報錯。存檔時若 Key 池全空也會先跳確認，避免存出空檔</li>
+              <li>限制先講：舊版 .doc 打不開（請轉存 docx）；掃描圖片版 PDF 沒有文字層不能翻；超長文件地端模型會翻比較久</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>摘要翻譯＋下載存檔</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>摘要下方新增<b>「🌐 翻譯」</b>：目標語言一次選一個（繁體中文／English／日本語／한국어／Deutsch），走目前的摘要服務（Gemini／Ollama）翻譯，譯文會跟著摘要一起保存在本機，重整頁面還在；重新生成摘要時舊譯文自動清空</li>
+              <li>新增<b>「📥 下載」</b>：把摘要＋待辦存成文字檔（檔名帶時間，含 BOM，Windows 記事本開中文不亂碼）；有譯文會一併附在同一檔，譯文也有獨立的「下載譯文」按鈕</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>RWD＋設定分區＋Faster-Whisper＋共用 api.json</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li><b>RWD 響應式版面</b>：手機維持單欄，平板放寬，桌機／大螢幕再放寬且設定區改雙欄，心智圖也隨螢幕加高，任何裝置都好讀</li>
+              <li>設定頁拆成<b>「🎙️ 語音辨識服務」</b>與<b>「🧠 會議記錄摘要」</b>兩區，各有目前使用的服務切換列；Ollama 設定也跟著分開（辨識一組位址＋模型、摘要一組位址＋模型，可指向不同台）</li>
+              <li>辨識新增<b>「🎯 地端 Faster-Whisper」</b>（預設 <code>http://127.0.0.1:8000</code>，免 Key，先試 OpenAI 相容端點再自動改試 <code>/asr</code>），錄音分頁的辨識服務下拉同步可選</li>
+              <li>新增<b>「🔗 共用 API Key（伺服器 api.json）」</b>：一鍵儲存／載入伺服器上的 <code>api.json</code>，多台共用同一組 Key；純靜態主機不接受寫入時可改用下載後手動上傳。⚠️ api.json 公開可讀，只適合信任的內網</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>免登入＋本機 Ollama：辨識／摘要可切換地端模型</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li><b>移除 LINE 登入與加好友檢查</b>：一般瀏覽器開啟即用，LINE 只保留為可選的發送管道（在 LINE 內才有送回聊天室／好友分享，一般瀏覽器改走系統分享或複製）</li>
+              <li>語音辨識新增<b>「本機 Ollama」</b>可選（預設 <code>http://127.0.0.1:11434</code>，模型可挑選，預設 qwen2.5-omni:7b），免 Key；提醒：純文字模型聽不懂語音，轉寫請改用 whisper／qwen2.5-omni／qwen3-omni／gemma3n 等支援語音的模型</li>
+              <li>AI 摘要（含心智圖）新增<b>「本機 Ollama」</b>可選（模型可挑選，預設 qwen2.5-omni:7b），免 Key；本機連不上時會明確提示檢查 <code>ollama serve</code> 與 <code>OLLAMA_ORIGINS</code> 跨域設定</li>
+              <li>錄音分頁與摘要分頁各多一組「服務／模型」下拉（可一鍵重新讀取本機模型清單），設定分頁新增共用的 Ollama 位址與模型設定區</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>AI 摘要新增待辦事項、來源核對、簡易心智圖；API Key 改為多把管理</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>AI 摘要現在會額外整理出<b>待辦事項清單</b>（誰要做什麼、期限），逐字稿沒有明確提到的負責人或期限會顯示空白，不會自己亂猜</li>
@@ -958,7 +1072,7 @@
     <div class="modal-box" style="max-width:380px;">
       <div class="modal-tabs"><button class="active" style="cursor:default;">ℹ️ 開始錄音前，先知道這件事</button></div>
       <div class="modal-body">
-        這個工具只做「即時音轉文字」，錄音轉成文字後<b>原始音檔就會被丟棄</b>，不會留存也不會上傳保存，但轉寫過程<b>會把這段語音上傳到 Groq 雲端伺服器處理</b>。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
+        這個工具只做「即時音轉文字」，錄音轉成文字後<b>原始音檔就會被丟棄</b>，不會留存也不會上傳保存，但轉寫過程<b>會把這段語音上傳到你所選的辨識服務處理（Groq 雲端，或你指定的 Ollama 位址）</b>。如果你需要留一份原始錄音備份，請另外用手機內建的錄音 App（語音備忘錄/錄音機）同時錄一份，兩者互相獨立。
       </div>
       <div class="modal-footer">
         <label><input type="checkbox" id="dontShowRecordNoticeCheckbox" checked> 下次不用再提醒我</label>
@@ -974,9 +1088,8 @@
       <div class="modal-body">
         這會清除目前這台裝置、這個瀏覽器裡儲存的：
         <ul style="padding-left:18px; margin:8px 0;">
-          <li>你填過的 Groq API Key</li>
+          <li>你填過的 Groq／Gemini API Key（Ollama 免 Key，只有位址與模型偏好會保留）</li>
           <li>「不用再提醒」的已讀記錄（下次會重新看到提示彈窗）</li>
-          <li>登入跳轉前暫存的待發送文字（若有）</li>
           <li><b>目前尚未發送出去的語音卡片內容</b>（卡片會自動即時儲存，方便誤觸返回或切換分頁時找回，但也代表清除時會一併被刪除，且無法復原）</li>
         </ul>
         <b>⚠️ 這個工具清不到的地方：</b>如果你曾經用「複製到剪貼簿」功能，筆記內容可能還留在系統剪貼簿裡（這是手機/瀏覽器本身的機制，網頁無法主動清除）。若這是共用裝置，建議額外複製一段無關文字覆蓋掉。
@@ -1060,27 +1173,21 @@
       <div class="gate-desc">請稍候，正在確認登入與好友狀態</div>
     </div>
 
-    <!-- 2. 不是好友 -->
-    <div class="gate-panel" id="gateNotFriend" style="display:none;">
-      <div class="gate-icon">🤖</div>
-      <div class="gate-title">請先加官方帳號好友</div>
-      <div class="gate-desc">這個工具僅開放給已加好友的使用者。請先加好友，完成後回來這個頁面重新整理即可繼續。</div>
-      <button class="btn-gate-primary" onclick="AccessGate.goAddFriend()">前往加好友</button>
-      <button class="btn-gate-secondary" onclick="AccessGate.recheck()">我已經加了，重新檢查</button>
-    </div>
+    <!-- 2. (已移除) 官方帳號好友檢查：不需加好友、不需登入 LINE，直接進使用須知。保留此註解避免日後誤加回閘門。 -->
 
     <!-- 3. 使用須知同意書 -->
     <div class="gate-panel gate-panel-consent" id="gateConsent" style="display:none;">
       <div class="gate-title">使用前，請詳閱以下說明</div>
       <div class="gate-consent-body">
-        <p>這是一個由官方帳號提供的<b>個人開發小工具</b>，用來把語音整理成文字卡片。使用前請確認你已了解以下事項：</p>
+        <p>這是一個<b>個人開發小工具</b>，用來把語音整理成文字卡片。<b>不需要登入 LINE、也不需要加任何官方帳號好友</b>，用一般瀏覽器（Chrome／Safari）開啟即可使用。使用前請確認你已了解以下事項：</p>
         <ul>
-          <li>需要自行申請並填入 Groq API Key 才能使用；<b>Key 會存在你這個裝置的瀏覽器裡</b>，若為共用裝置請於使用後清除本機資料</li>
-          <li>你錄製的語音內容<b>會上傳到 Groq 雲端伺服器</b>進行轉寫處理，原始音檔不會被保留，僅保留轉寫後的文字</li>
+          <li>語音辨識可用「Groq 雲端」（需自備 API Key）、「本機 Ollama」（免 Key，預設 <code>http://127.0.0.1:11434</code>）或「地端 Faster-Whisper」（免 Key，預設 <code>http://127.0.0.1:8000</code>），在「🎙️ 語音辨識服務」設定區切換；Key 只存在這個裝置的瀏覽器裡</li>
+          <li>你錄製的語音內容<b>會上傳到所選的轉寫服務</b>進行處理（Groq 雲端，或你指定的 Ollama／Faster-Whisper 位址），原始音檔不會被保留，僅保留轉寫後的文字；位址就是自己電腦時，語音不會離開本機</li>
+          <li>AI 摘要預設使用 Google Gemini 雲端（選填，需自備 Key）；同樣可在「🧠 會議記錄摘要」設定區切換成<b>本機 Ollama</b>，逐字稿就只會送到你指定的本機位址</li>
+          <li>「🔗 共用 API Key」可把 Key 存到伺服器 <code>api.json</code> 供多台共用，但該檔案是<b>公開可讀</b>的，只適合信任的內網，不要放機密 Key</li>
           <li>整理好的<b>語音卡片內容同樣會存在這個裝置的瀏覽器裡</b>，方便誤觸返回或切出頁面時找回，若為共用裝置也請於使用後一併清除</li>
           <li>本工具<b>不建議</b>用於處理真正機密或高度敏感的內容（例如商業機密、他人個資、密碼、身分證字號等）</li>
           <li>這是個人維護的小工具，<b>沒有正式的客服或服務保證</b>，可能因故調整或中止服務</li>
-          <li>若你發現安全性問題或有濫用情形，歡迎透過官方帳號回報</li>
         </ul>
         <p>點選「我已閱讀並同意」代表你已了解並願意自行承擔上述使用情境下的風險；若不同意，請關閉此頁面。</p>
       </div>
@@ -1100,7 +1207,7 @@
       <span class="toast-text" id="storageToastText"></span>
     </div>
 
-    <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／⚙️設定，
+    <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／📄文件／⚙️設定，
          同一時間只顯示一個分頁內容 -->
     <div class="main-tabs">
       <button id="navTabRecord" class="active" onclick="MainNav.switchTo('record')">
@@ -1115,34 +1222,61 @@
       <button id="navTabSummary" onclick="MainNav.switchTo('summary')">
         <span class="tab-icon">📝</span><span class="tab-label">摘要</span>
       </button>
+      <button id="navTabFile" onclick="MainNav.switchTo('file')">
+        <span class="tab-icon">📄</span><span class="tab-label">文件</span>
+      </button>
       <button id="navTabSettings" onclick="MainNav.switchTo('settings')">
         <span class="tab-icon">⚙️</span><span class="tab-label">設定</span>
       </button>
     </div>
 
     <main>
-      <!-- ============ Tab 1／5：錄音 ============ -->
+      <!-- ============ Tab 1／6：錄音 ============ -->
       <div id="navPanelRecord" class="nav-panel">
         <!-- 只在 Key 未設定時顯示，點擊直接跳轉設定分頁 -->
         <div class="key-missing-hint hidden" id="recordKeyMissingHint" onclick="MainNav.switchTo('settings')">
-          🔑 尚未設定 Groq API Key，點此前往設定
+          🔑 尚未設定語音辨識服務，點此前往設定
+        </div>
+
+        <div class="lang-select-row">
+          <label for="sttProviderSelect" class="lang-select-label">🎙️ 辨識服務</label>
+          <select id="sttProviderSelect" onchange="AIProviderConfig.setSttProvider(this.value)">
+            <option value="groq">☁️ Groq 雲端</option>
+            <option value="ollama">🖥️ 本機 Ollama</option>
+            <option value="fw">🎯 地端 Faster-Whisper</option>
+          </select>
+        </div>
+        <div class="lang-select-row" id="sttFwModelRow" style="display:none;">
+          <label for="sttFwModelSelect" class="lang-select-label">🎯 FW 模型</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select id="sttFwModelSelect" onchange="AIProviderConfig.setFwModel(this.value)" style="max-width:150px;"></select>
+            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshFwModels()" title="重新讀取 Faster-Whisper 模型清單">🔄</button>
+          </div>
+        </div>
+        <div class="lang-select-row" id="sttOllamaModelRow" style="display:none;">
+          <label for="sttOllamaModelSelect" class="lang-select-label">🖥️ Ollama 轉寫模型</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select id="sttOllamaModelSelect" onchange="AIProviderConfig.setSttModel(this.value)" style="max-width:150px;"></select>
+            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshModels('stt')" title="重新讀取本機模型清單">🔄</button>
+          </div>
         </div>
 
         <div class="lang-select-row">
           <label for="langSelect" class="lang-select-label">🌐 辨識語言</label>
           <select id="langSelect" onchange="LanguageManager.onUserSelect(this.value)">
+            <option value="auto">自動（中英日韓德混雜）</option>
             <option value="zh" selected>中文</option>
             <option value="en">英文</option>
             <option value="ja">日文</option>
             <option value="ko">韓文</option>
-            <option value="auto">自動（中英日韓混雜）</option>
+            <option value="de">德文</option>
           </select>
         </div>
 
         <div class="meeting-mode" id="meetingCard">
           <div class="rec-orb" id="recOrb">🎙️</div>
           <div class="rec-status-text" id="recStatusText">尚未開始</div>
-          <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（100% 支援 LIFF 內部）</div>
+          <div class="rec-sub-text" id="recSubText">點擊下方按鈕開始錄音（一般瀏覽器即可使用）</div>
           <div class="lang-detect-hint" id="langDetectHint" style="display:none;"></div>
           <div class="live-preview-list" id="livePreviewList">
             <div class="live-preview-empty">尚未有轉寫內容</div>
@@ -1164,7 +1298,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 2／5：筆記（語音卡片） ============ -->
+      <!-- ============ Tab 2／6：筆記（語音卡片） ============ -->
       <div id="navPanelCards" class="nav-panel hidden">
         <div class="copy-sheet-format-row">
           <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" title="把目前所有卡片內容整理成一包資料，貼到 Google Sheet 空白儲存格即可">
@@ -1181,7 +1315,7 @@
         <div class="cards" id="cardsList"></div>
       </div>
 
-      <!-- ============ Tab 3／5：共享筆記 ============ -->
+      <!-- ============ Tab 3／6：共享筆記 ============ -->
       <div id="navPanelShared" class="nav-panel hidden">
         <!-- 唯讀查看共享 Google Sheet 筆記，可勾選並與語音卡片混合送去
              「摘要」分頁生成，順序依勾選先後決定。完全不寫入 Sheet -->
@@ -1217,11 +1351,25 @@
         </div>
       </div>
 
-      <!-- ============ Tab 4／5：AI 摘要 ============ -->
+      <!-- ============ Tab 4／6：AI 摘要 ============ -->
       <div id="navPanelSummary" class="nav-panel hidden">
         <!-- 摘要來源讀取 SelectionPool（卡片+共享筆記統一勾選池） -->
         <div class="key-missing-hint hidden" id="summaryKeyMissingHint" onclick="MainNav.switchTo('settings')">
-          🔑 尚未設定 Gemini API Key，點此前往設定（選填功能）
+          🔑 尚未設定 AI 摘要服務，點此前往設定（選填功能）
+        </div>
+        <div class="lang-select-row">
+          <label for="summaryProviderSelect" class="lang-select-label">🧠 摘要服務</label>
+          <select id="summaryProviderSelect" onchange="AIProviderConfig.setSummaryProvider(this.value)">
+            <option value="gemini">☁️ Gemini 雲端</option>
+            <option value="ollama">🖥️ 本機 Ollama</option>
+          </select>
+        </div>
+        <div class="lang-select-row" id="summaryOllamaModelRow" style="display:none;">
+          <label for="summaryOllamaModelSelect" class="lang-select-label">🖥️ Ollama 摘要模型</label>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select id="summaryOllamaModelSelect" onchange="AIProviderConfig.setSummaryModel(this.value)" style="max-width:150px;"></select>
+            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshModels('summary')" title="重新讀取本機模型清單">🔄</button>
+          </div>
         </div>
         <div class="summary-panel" id="summaryPanel">
           <div class="summary-pool-hint" id="summaryPoolHint">尚未勾選任何資料。到「共享」分頁勾選共享筆記項目，或在「筆記」分頁切到「✅ 勾選模式」勾選卡片，即可納入摘要來源。</div>
@@ -1255,7 +1403,7 @@
             </div>
 
             <div id="mindmapGenerateWrap" class="mindmap-generate-wrap">
-              <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次 Gemini。</div>
+              <div class="mindmap-generate-hint" id="mindmapGenerateHint">心智圖會根據上方已生成的摘要內容另外整理，需要再呼叫一次所選的摘要服務（Gemini／Ollama）。</div>
               <button class="btn-mindmap-rerender" id="mindmapGenerateBtn" onclick="SummaryModule.generateMindmap()">🧠 產生心智圖</button>
             </div>
 
@@ -1276,25 +1424,101 @@
             </div>
           </div>
 
-          <div class="summary-actions-row hidden" id="summaryActionsRow">
-            <span class="summary-saved-hint">💾 已保存在本機</span>
+          <div class="summary-actions-row" id="summaryActionsRow">
+            <span class="summary-saved-hint" id="summaryActionsHint">尚未生成摘要</span>
             <div class="summary-actions-inline">
               <button class="copy" onclick="SummaryModule.copy()" title="複製摘要文字">📋 複製</button>
+              <button class="share" onclick="SummaryModule.download()" title="下載成文字檔">📥 下載</button>
               <button class="share" onclick="SummaryModule.share()" title="分享摘要">🔗 分享</button>
               <button class="copysheet" onclick="SummaryModule.copyToSheet()" title="複製成可貼進共用 Sheet 的格式">📤 存回 Sheet</button>
               <button class="del" onclick="SummaryModule.remove()" title="刪除已保存的摘要">✕ 刪除</button>
             </div>
           </div>
+
+          <!-- 摘要翻譯：目標語言一次選一個，走目前的摘要服務（Gemini／Ollama） -->
+          <div class="translate-row" id="translateRow">
+            <span class="provider-switch-label">🌐 將摘要翻譯成：</span>
+            <select id="translateLangSelect">
+              <option value="zh">繁體中文</option>
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="de">Deutsch</option>
+            </select>
+            <button class="keypool-add-btn" id="translateBtn" onclick="SummaryModule.translate()">翻譯</button>
+            <span class="translate-hint" id="translateHint">⚠️ 請先在上方生成摘要，才能翻譯</span>
+          </div>
+          <div class="summary-output hidden" id="translateOutputBox"></div>
+          <div class="translate-actions-row hidden" id="translateActionsRow">
+            <div class="summary-actions-inline">
+              <button class="copy" onclick="SummaryModule.copyTranslation()" title="複製譯文">📋 複製譯文</button>
+              <button class="share" onclick="SummaryModule.downloadTranslation()" title="下載譯文成文字檔">📥 下載譯文</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- ============ Tab 5／5：設定 ============ -->
+      <!-- ============ Tab 5／6：文件翻譯 ============ -->
+      <div id="navPanelFile" class="nav-panel hidden">
+        <!-- 翻譯走摘要服務的共用設定，未就緒時顯示此提示 -->
+        <div class="key-missing-hint hidden" id="fileKeyMissingHint" onclick="MainNav.switchTo('settings')">
+          🔑 尚未設定 AI 服務，點此前往設定
+        </div>
+
+        <div class="upload-panel">
+          <div class="upload-panel-label">📄 上傳 PDF／Word 文件</div>
+          <div class="upload-panel-desc">支援 PDF（需有文字層，掃描圖片版讀不到字）與 DOCX。舊版 .doc 請先用 Word 另存為 .docx。檔案在本機解析，不會上傳到任何地方；按下翻譯後才會走你選的摘要服務（Gemini／Ollama）。</div>
+          <label class="btn-upload-choose" for="docFileInput" id="docFileChooseLabel">選擇文件檔案</label>
+          <input type="file" id="docFileInput" accept=".pdf,.docx,.doc,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" onchange="FileTransModule.onFileSelected(this.files)">
+          <div class="upload-file-name" id="docFileName"></div>
+          <div class="upload-progress-row" id="docProgressRow">
+            <div class="upload-progress-spinner"></div>
+            <span id="docProgressText">解析中...</span>
+          </div>
+        </div>
+
+        <div class="lang-select-row" style="margin-top:12px;">
+          <label for="fileTranslateLangSelect" class="lang-select-label">🌐 翻譯成</label>
+          <select id="fileTranslateLangSelect">
+            <option value="zh">繁體中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </div>
+
+        <div class="summary-panel" id="fileTransPanel">
+          <div class="summary-pool-hint" id="fileSourceHint">尚未上傳文件。上傳後會顯示字數／頁數，選好目標語言後按下方按鈕開始翻譯。</div>
+          <button class="btn-summary-generate" id="fileTranslateBtn" onclick="FileTransModule.translate()">🌐 翻譯文件</button>
+          <div class="summary-output empty" id="fileOutputBox">
+            譯文會顯示在這裡。長文件會自動分段、逐段翻譯。
+          </div>
+          <div class="translate-actions-row hidden" id="fileActionsRow">
+            <div class="summary-actions-inline">
+              <button class="copy" onclick="FileTransModule.copy()" title="複製譯文">📋 複製譯文</button>
+              <button class="share" onclick="FileTransModule.download()" title="下載譯文成文字檔">📥 下載譯文</button>
+              <button class="del" onclick="FileTransModule.remove()" title="清除文件與譯文">✕ 清除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ Tab 6／6：設定 ============ -->
       <div id="navPanelSettings" class="nav-panel hidden">
-        <div class="settings-section-label">🔑 API Key</div>
+        <div class="settings-section-label">🎙️ 語音辨識服務</div>
+        <div class="provider-switch-row">
+          <span class="provider-switch-label">目前使用：</span>
+          <div class="provider-switch-btns" id="sttProviderBtns">
+            <button data-stt-provider="groq" onclick="AIProviderConfig.setSttProvider('groq')">☁️ Groq 雲端</button>
+            <button data-stt-provider="ollama" onclick="AIProviderConfig.setSttProvider('ollama')">🖥️ 本機 Ollama</button>
+            <button data-stt-provider="fw" onclick="AIProviderConfig.setSttProvider('fw')">🎯 Faster-Whisper</button>
+          </div>
+        </div>
 
         <div class="key-panel">
-          <div class="key-panel-label">Groq API Key（錄音轉文字用，必填）</div>
-          <div class="key-panel-desc">可以預先存好多把 Key，額度用完或某把被刪除失效時，不用重新輸入，直接切換到下一把即可。目前使用中的那把會用綠框標示，最多可存 12 把。</div>
+          <div class="key-panel-label">Groq API Key（辨識服務選「Groq 雲端」時必填）</div>
+          <div class="key-panel-desc">可以預先存好多把 Key，額度用完或某把被刪除失效時，不用重新輸入，直接切換到下一把即可。目前使用中的那把會用綠框標示，最多可存 12 把。若辨識服務切成「本機 Ollama」或「Faster-Whisper」，此處可留空。</div>
 
           <div class="keypool-list" id="groqKeyPoolList"></div>
 
@@ -1329,9 +1553,58 @@
           </details>
         </div>
 
+        <div class="zone-panels">
         <div class="key-panel">
-          <div class="key-panel-label">Gemini API Key（AI 摘要用，選填）</div>
-          <div class="key-panel-desc">要使用「AI 摘要」功能才需要填寫。同樣可以預先存好多把 Key（最多 5 把），失效時直接切換即可。</div>
+          <div class="key-panel-label">🖥️ 本機 Ollama（辨識用，免 Key）</div>
+          <div class="key-panel-desc">辨識服務切成「本機 Ollama」時使用，語音只會送到下面這個位址。預設 <code>http://127.0.0.1:11434</code>。若連不上，請確認：① <code>ollama serve</code> 已啟動；② 有允許跨域（例如 <code>OLLAMA_ORIGINS=*</code>）；③ 防火牆沒有擋掉 11434。</div>
+          <div class="key-panel-label" style="margin-top:10px;">服務位址</div>
+          <div class="keypool-add-row">
+            <input type="text" id="ollamaSttBaseUrlInput" placeholder="http://127.0.0.1:11434" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.testOllama('stt')">測試連線</button>
+          </div>
+          <div class="keypool-count-hint" id="ollamaSttConnHint">尚未測試連線</div>
+          <div class="key-panel-label" style="margin-top:10px;">🎙️ 轉寫模型</div>
+          <div class="key-panel-desc">注意：純文字模型<b>聽不懂語音</b>，轉寫請用支援語音的模型（whisper 系列、qwen2.5-omni、qwen3-omni、gemma3n 等）。可用下方按鈕讀取本機已安裝的模型清單再挑選。</div>
+          <div class="keypool-add-row">
+            <input type="text" id="ollamaSttModelInput" placeholder="qwen2.5-omni:7b" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.saveOllamaStt()">儲存</button>
+          </div>
+          <div class="keypool-add-row" style="margin-top:8px;">
+            <button class="keypool-add-btn" style="width:100%; padding:10px;" onclick="AIProviderConfig.refreshModels('stt')">🔄 重新讀取本機模型清單</button>
+          </div>
+          <div class="keypool-count-hint" id="ollamaSttModelsHint"></div>
+        </div>
+
+        <div class="key-panel">
+          <div class="key-panel-label">🎯 地端 Faster-Whisper（辨識用，免 Key）</div>
+          <div class="key-panel-desc">辨識服務切成「Faster-Whisper」時使用，依序自動試三種端點：OpenAI 相容的 <code>/v1/audio/transcriptions</code> → 舊式 <code>/asr</code> → whisper.cpp 的 <code>/inference</code>（例：<code>whisper-server -m ggml-small.bin --port 8000</code>）。預設 <code>http://127.0.0.1:8000</code>。若連不上，請確認：① 服務已啟動；② 有開 CORS（瀏覽器直連需要，whisper.cpp 預設已有）；③ 防火牆沒有擋掉對應 port。</div>
+          <div class="key-panel-label" style="margin-top:10px;">服務位址</div>
+          <div class="keypool-add-row">
+            <input type="text" id="fwBaseUrlInput" placeholder="http://127.0.0.1:8000" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.testFw()">測試連線</button>
+          </div>
+          <div class="keypool-count-hint" id="fwConnHint">尚未測試連線</div>
+          <div class="key-panel-label" style="margin-top:10px;">🎯 轉寫模型</div>
+          <div class="key-panel-desc">填服務載入的模型名稱（常見：tiny／base／small／medium／large-v2／large-v3，越大越準但越慢）。若用 whisper.cpp（whisper-server），模型由啟動參數 <code>-m</code> 決定，這裡填的僅供顯示、以實際載入的為準。</div>
+          <div class="keypool-add-row">
+            <input type="text" id="fwModelInput" placeholder="large-v3" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.saveFw()">儲存</button>
+          </div>
+        </div>
+        </div>
+
+        <div class="settings-section-label">🧠 會議記錄摘要</div>
+        <div class="provider-switch-row">
+          <span class="provider-switch-label">目前使用：</span>
+          <div class="provider-switch-btns" id="sumProviderBtns">
+            <button data-sum-provider="gemini" onclick="AIProviderConfig.setSummaryProvider('gemini')">☁️ Gemini 雲端</button>
+            <button data-sum-provider="ollama" onclick="AIProviderConfig.setSummaryProvider('ollama')">🖥️ 本機 Ollama</button>
+          </div>
+        </div>
+
+        <div class="key-panel">
+          <div class="key-panel-label">Gemini API Key（摘要服務選「Gemini 雲端」時才需要）</div>
+          <div class="key-panel-desc">要使用「AI 摘要」功能且摘要服務選「Gemini 雲端」時才需要填寫。同樣可以預先存好多把 Key（最多 5 把），失效時直接切換即可。若摘要服務切成「本機 Ollama」，此處可留空。</div>
 
           <div class="keypool-list" id="geminiKeyPoolList"></div>
 
@@ -1364,6 +1637,39 @@
               <div class="guide-note">免費額度足夠日常使用，不需要信用卡；金鑰只存在你自己手機瀏覽器裡，不會被上傳到任何地方。這個 Key 是選填的，只有要用「AI 摘要」功能時才需要設定，不影響錄音轉文字等其他功能。</div>
             </div>
           </details>
+        </div>
+
+        <div class="zone-panels">
+        <div class="key-panel">
+          <div class="key-panel-label">🖥️ 本機 Ollama（摘要用，免 Key）</div>
+          <div class="key-panel-desc">摘要服務切成「本機 Ollama」時使用，逐字稿只會送到下面這個位址（可跟辨識用不同台）。預設 <code>http://127.0.0.1:11434</code>。連不上請確認 <code>ollama serve</code> 已啟動＋有允許跨域（<code>OLLAMA_ORIGINS=*</code>）。</div>
+          <div class="key-panel-label" style="margin-top:10px;">服務位址</div>
+          <div class="keypool-add-row">
+            <input type="text" id="ollamaSumBaseUrlInput" placeholder="http://127.0.0.1:11434" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.testOllama('summary')">測試連線</button>
+          </div>
+          <div class="keypool-count-hint" id="ollamaSumConnHint">尚未測試連線</div>
+          <div class="key-panel-label" style="margin-top:10px;">🧠 摘要模型</div>
+          <div class="keypool-add-row">
+            <input type="text" id="ollamaSumModelInput" placeholder="qwen2.5-omni:7b" style="flex:1;">
+            <button class="keypool-add-btn" onclick="AIProviderConfig.saveOllamaSum()">儲存</button>
+          </div>
+          <div class="keypool-add-row" style="margin-top:8px;">
+            <button class="keypool-add-btn" style="width:100%; padding:10px;" onclick="AIProviderConfig.refreshModels('summary')">🔄 重新讀取本機模型清單</button>
+          </div>
+          <div class="keypool-count-hint" id="ollamaSumModelsHint"></div>
+        </div>
+        </div>
+
+        <div class="key-panel">
+          <div class="key-panel-label">🔗 共用 API Key（伺服器 api.json）</div>
+          <div class="key-panel-desc">把目前的 Groq／Gemini Key 池與服務選擇存到伺服器上的 <code>api.json</code>，同網址的其他裝置按「從伺服器載入」即可共用同一組 Key，不用逐台輸入。<b>⚠️ api.json 放在伺服器上就是公開可讀的，只適合信任的內網／自家伺服器，不要放真正機密的 Key；本機 Ollama／Faster-Whisper 免 Key，位址與模型也會一併共用。載入時若某邊 Key 池是空的會自動略過、保留本機原值。</b><br>註：純靜態主機（如 GitHub Pages）收不到寫入，「儲存到伺服器」會失敗，此時請改按「下載 api.json」再手動放到伺服器同一目錄。</div>
+          <div class="server-sync-row">
+            <button class="btn-sync-load" onclick="ServerKeySync.load()">📥 從伺服器載入</button>
+            <button class="btn-sync-save" onclick="ServerKeySync.save()">📤 儲存到伺服器</button>
+            <button class="btn-sync-dl" onclick="ServerKeySync.download()">⬇️ 下載 api.json</button>
+          </div>
+          <div class="keypool-count-hint" id="serverKeySyncHint">尚未檢查伺服器上的 api.json</div>
         </div>
 
         <!-- 逐項刪除，狀態燈號（綠=已設定／灰=無資料）方便辨識 -->
@@ -1403,12 +1709,12 @@
       <div class="modal-tabs"><button class="active" style="cursor:default;">🔗 分享出去</button></div>
       <div class="modal-body" style="padding:12px;">
         <div class="share-option" onclick="ShareMenu.selectLineFriend()">
-          <div class="share-option-title">📤 LINE 好友分享</div>
-          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送。<b>需要先登入 LINE</b>，且對方要在你的好友清單裡才選得到。</div>
+          <div class="share-option-title">📤 LINE 好友分享（可選）</div>
+          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送。<b>只有在 LINE 內開啟且可用時才有效</b>，一般瀏覽器會自動改用複製或系統分享，不需登入也能用其他方式送出。</div>
         </div>
         <div class="share-option" onclick="ShareMenu.selectOtherApp()">
-          <div class="share-option-title">📲 分享至其他應用程式</div>
-          <div class="share-option-desc">跳出手機系統的分享選單（LINE、簡訊、Email 等）。<b>在 LINE 內開啟此頁面時無法使用</b>（LINE 內建瀏覽器限制），會自動改用「LINE 好友分享」；在一般瀏覽器（如 Chrome、Safari）開啟時才能正常跳出系統選單。</div>
+          <div class="share-option-title">📲 分享至其他應用程式（推薦）</div>
+          <div class="share-option-desc">跳出手機系統的分享選單（LINE、簡訊、Email 等），<b>不需要登入</b>。<b>在 LINE 內開啟此頁面時無法使用</b>（LINE 內建瀏覽器限制），會自動改用「LINE 好友分享」或複製；一般瀏覽器可正常使用。</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1423,8 +1729,8 @@
       <div class="modal-tabs"><button class="active" style="cursor:default;">🔗 分享摘要</button></div>
       <div class="modal-body" style="padding:12px;">
         <div class="share-option" onclick="SummaryModule.shareViaLineFriend()">
-          <div class="share-option-title">📤 LINE 好友分享</div>
-          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送摘要文字。<b>需要先登入 LINE</b>。</div>
+          <div class="share-option-title">📤 LINE 好友分享（可選）</div>
+          <div class="share-option-desc">跳出 LINE 好友／群組清單，挑一個對象發送摘要文字。<b>只有在 LINE 內開啟且可用時才有效</b>，一般瀏覽器會改用系統分享或複製。</div>
         </div>
         <div class="share-option" onclick="SummaryModule.shareViaWebShare()">
           <div class="share-option-title">📲 分享至其他應用程式</div>
@@ -1448,6 +1754,24 @@
       // token 估算僅供參考（中文約 2.5 token/字），不同模型 tokenizer 有差異
       estimateTokens(charCount) {
         return Math.round(charCount * 2.5);
+      },
+      // 文字檔下載共用（摘要／譯文／文件譯文共用）。開頭加 BOM，
+      // Windows 記事本開中文才不會亂碼。
+      downloadTextFile(filename, content) {
+        try {
+          const blob = new Blob(['\ufeff' + content], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          return true;
+        } catch (e) {
+          console.error('下載失敗：', e);
+          alert('下載失敗：' + (e.message || e));
+          return false;
+        }
       }
     };
 
@@ -1478,10 +1802,915 @@
       }
     };
 
+    // ---------- AI 服務供應商設定（Groq/Gemini 雲端 vs 本機 Ollama）----------
+    // STT（語音辨識）：'groq' | 'ollama'；摘要：'gemini' | 'ollama'。
+    // Ollama 設定存在 localStorage：baseUrl、sttModel、summaryModel。
+    // ---------- AI 服務供應商設定（雲端 vs 地端）----------
+    // STT（語音辨識）：'groq' | 'ollama' | 'fw'（Faster-Whisper）；
+    // 摘要：'gemini' | 'ollama'。
+    // Ollama 位址／模型依用途分開存（辨識一組、摘要一組）；
+    // 舊版共用的 ollama_base_url 仍保留相容讀取，第一次讀不到新鍵
+    // 時自動沿用舊值，不需手動遷移。
+    const AIProviderConfig = {
+      LS_STT_PROVIDER: 'ai_stt_provider',
+      LS_SUMMARY_PROVIDER: 'ai_summary_provider',
+      LS_STT_BASE_URL: 'ollama_stt_base_url',
+      LS_SUM_BASE_URL: 'ollama_sum_base_url',
+      LS_BASE_URL: 'ollama_base_url',
+      LS_STT_MODEL: 'ollama_stt_model',
+      LS_SUMMARY_MODEL: 'ollama_summary_model',
+      LS_FW_BASE_URL: 'fw_base_url',
+      LS_FW_MODEL: 'fw_stt_model',
+      DEFAULT_BASE_URL: 'http://127.0.0.1:11434',
+      DEFAULT_MODEL: 'qwen2.5-omni:7b',
+      DEFAULT_FW_BASE_URL: 'http://127.0.0.1:8000',
+      DEFAULT_FW_MODEL: 'large-v3',
+      STT_PROVIDERS: ['groq', 'ollama', 'fw'],
+      FW_MODEL_CHOICES: ['tiny', 'base', 'small', 'medium', 'large-v2', 'large-v3'],
+      STT_LABELS: { groq: 'Groq 雲端', ollama: '本機 Ollama', fw: 'Faster-Whisper' },
+
+      _get(key, fallback) {
+        try { return (localStorage.getItem(key) || '').trim() || fallback; }
+        catch (e) { return fallback; }
+      },
+      _set(key, value) {
+        try { localStorage.setItem(key, value); } catch (e) {}
+      },
+      _cleanBase(v, fallback) {
+        return ((v || '').trim() || fallback).replace(/\/+$/, '');
+      },
+
+      getSttProvider() {
+        const v = this._get(this.LS_STT_PROVIDER, 'groq');
+        return this.STT_PROVIDERS.includes(v) ? v : 'groq';
+      },
+      getSummaryProvider() {
+        const v = this._get(this.LS_SUMMARY_PROVIDER, 'gemini');
+        return v === 'ollama' ? 'ollama' : 'gemini';
+      },
+      // 相容舊版：新鍵沒有才讀舊的共用鍵
+      getSttBaseUrl() {
+        try {
+          const v = (localStorage.getItem(this.LS_STT_BASE_URL) || '').trim();
+          if (v) return v.replace(/\/+$/, '');
+          const legacy = (localStorage.getItem(this.LS_BASE_URL) || '').trim();
+          return (legacy || this.DEFAULT_BASE_URL).replace(/\/+$/, '');
+        } catch (e) { return this.DEFAULT_BASE_URL; }
+      },
+      getSumBaseUrl() {
+        try {
+          const v = (localStorage.getItem(this.LS_SUM_BASE_URL) || '').trim();
+          if (v) return v.replace(/\/+$/, '');
+          const legacy = (localStorage.getItem(this.LS_BASE_URL) || '').trim();
+          return (legacy || this.DEFAULT_BASE_URL).replace(/\/+$/, '');
+        } catch (e) { return this.DEFAULT_BASE_URL; }
+      },
+      // 舊呼叫保留：預設回辨識用位址
+      getBaseUrl() { return this.getSttBaseUrl(); },
+      getSttModel() { return this._get(this.LS_STT_MODEL, this.DEFAULT_MODEL); },
+      getSummaryModel() { return this._get(this.LS_SUMMARY_MODEL, this.DEFAULT_MODEL); },
+      getFwBaseUrl() { return this._cleanBase(this._get(this.LS_FW_BASE_URL, ''), this.DEFAULT_FW_BASE_URL); },
+      getFwModel() { return this._get(this.LS_FW_MODEL, this.DEFAULT_FW_MODEL); },
+
+      setSttProvider(v) {
+        this._set(this.LS_STT_PROVIDER, this.STT_PROVIDERS.includes(v) ? v : 'groq');
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+      setSummaryProvider(v) {
+        this._set(this.LS_SUMMARY_PROVIDER, v === 'ollama' ? 'ollama' : 'gemini');
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+      setSttModel(v) {
+        this._set(this.LS_STT_MODEL, (v || '').trim() || this.DEFAULT_MODEL);
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+      setSummaryModel(v) {
+        this._set(this.LS_SUMMARY_MODEL, (v || '').trim() || this.DEFAULT_MODEL);
+        this.syncUI();
+      },
+      setFwModel(v) {
+        this._set(this.LS_FW_MODEL, (v || '').trim() || this.DEFAULT_FW_MODEL);
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+      setSttBaseUrl(v) {
+        const cleaned = this._cleanBase(v, this.DEFAULT_BASE_URL);
+        this._set(this.LS_STT_BASE_URL, cleaned);
+        return cleaned;
+      },
+      setSumBaseUrl(v) {
+        const cleaned = this._cleanBase(v, this.DEFAULT_BASE_URL);
+        this._set(this.LS_SUM_BASE_URL, cleaned);
+        return cleaned;
+      },
+      setFwBaseUrl(v) {
+        const cleaned = this._cleanBase(v, this.DEFAULT_FW_BASE_URL);
+        this._set(this.LS_FW_BASE_URL, cleaned);
+        return cleaned;
+      },
+      // 舊版共用儲存（保留相容）：同時寫入辨識／摘要兩組
+      setBaseUrl(v) {
+        const cleaned = this._cleanBase(v, this.DEFAULT_BASE_URL);
+        this._set(this.LS_STT_BASE_URL, cleaned);
+        this._set(this.LS_SUM_BASE_URL, cleaned);
+        return cleaned;
+      },
+      saveOllamaStt() {
+        const baseEl = document.getElementById('ollamaSttBaseUrlInput');
+        const sttEl = document.getElementById('ollamaSttModelInput');
+        if (baseEl) this.setSttBaseUrl(baseEl.value);
+        if (sttEl) this.setSttModel(sttEl.value);
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+        alert('已儲存 Ollama（辨識用）設定。');
+      },
+      saveOllamaSum() {
+        const baseEl = document.getElementById('ollamaSumBaseUrlInput');
+        const sumEl = document.getElementById('ollamaSumModelInput');
+        if (baseEl) this.setSumBaseUrl(baseEl.value);
+        if (sumEl) this.setSummaryModel(sumEl.value);
+        this.syncUI();
+        alert('已儲存 Ollama（摘要用）設定。');
+      },
+      saveFw() {
+        const baseEl = document.getElementById('fwBaseUrlInput');
+        const modelEl = document.getElementById('fwModelInput');
+        if (baseEl) this.setFwBaseUrl(baseEl.value);
+        if (modelEl) this.setFwModel(modelEl.value);
+        this.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+        alert('已儲存 Faster-Whisper 設定。');
+      },
+      // 舊入口保留（相容舊快取頁面）：三區一起存
+      saveModelsFromSettings() {
+        this.saveOllamaStt();
+        this.saveOllamaSum();
+        this.saveFw();
+      },
+      async testOllama(which) {
+        const isSum = which === 'summary';
+        const baseEl = document.getElementById(isSum ? 'ollamaSumBaseUrlInput' : 'ollamaSttBaseUrlInput');
+        const hint = document.getElementById(isSum ? 'ollamaSumConnHint' : 'ollamaSttConnHint');
+        const base = isSum ? this.setSumBaseUrl(baseEl ? baseEl.value : '') : this.setSttBaseUrl(baseEl ? baseEl.value : '');
+        if (baseEl) baseEl.value = base;
+        if (hint) hint.textContent = '連線測試中...';
+        try {
+          const models = await OllamaClient.listModels(base);
+          if (hint) hint.textContent = `✅ 連線成功，本機共有 ${models.length} 個模型。`;
+          await this.refreshModels(isSum ? 'summary' : 'stt');
+        } catch (err) {
+          console.error('Ollama 連線測試失敗：', err);
+          if (hint) hint.textContent = '❌ 連線失敗：' + err.message + '（請確認 ollama serve 已啟動＋OLLAMA_ORIGINS 允許跨域）';
+        }
+      },
+      // 舊入口保留
+      async testConnection() { return this.testOllama('stt'); },
+      async testFw() {
+        const baseEl = document.getElementById('fwBaseUrlInput');
+        const hint = document.getElementById('fwConnHint');
+        const base = this.setFwBaseUrl(baseEl ? baseEl.value : '');
+        if (baseEl) baseEl.value = base;
+        if (hint) hint.textContent = '連線測試中...';
+        // 1. OpenAI 相容服務（含 /v1/models）：直接報模型數
+        try {
+          const models = await FasterWhisperClient.listModels(base);
+          if (hint) hint.textContent = models.length
+            ? `✅ 連線成功，服務端共有 ${models.length} 個可用模型。`
+            : '✅ 伺服器有回應（但讀不到模型清單，不影響轉寫，模型名稱請手動填對）。';
+          await this.refreshFwModels();
+          return;
+        } catch (e1) {
+          console.warn('FW /v1/models 不可用，改探測 whisper.cpp：', e1);
+        }
+        // 2. whisper.cpp（whisper-server）：沒有 /v1/models，GET / 回 HTML。
+        // 內容含 whisper 字樣即判定在線（它預設送 Access-Control-Allow-Origin: *，可跨域）。
+        try {
+          const res = await fetch(base + '/');
+          const ct = res.headers.get('content-type') || '';
+          let body = '';
+          if (ct.includes('html')) {
+            try { body = await res.text(); } catch (e) {}
+          }
+          if (res.ok && /whisper/i.test(body)) {
+            if (hint) hint.textContent = '✅ 連線成功：偵測到 whisper.cpp 伺服器（/inference），模型由啟動參數 -m 決定，可直接錄音轉寫。';
+            return;
+          }
+          if (res.ok) {
+            if (hint) hint.textContent = '✅ 伺服器有回應（非 OpenAI 相容端點，轉寫時會自動試 /asr 與 /inference）。';
+            return;
+          }
+          throw new Error('HTTP ' + res.status);
+        } catch (err) {
+          console.error('Faster-Whisper 連線測試失敗：', err);
+          if (hint) hint.textContent = '❌ 連線失敗：' + (err.message || err) + '（請確認服務已啟動＋有開 CORS＋防火牆沒擋 port）';
+        }
+      },
+      async refreshModels(scope) {
+        const jobs = [];
+        if (scope === 'stt' || scope === 'all') jobs.push(['stt', this.getSttBaseUrl(), 'sttOllamaModelSelect', 'ollamaSttModelsHint', this.getSttModel()]);
+        if (scope === 'summary' || scope === 'all') jobs.push(['summary', this.getSumBaseUrl(), 'summaryOllamaModelSelect', 'ollamaSumModelsHint', this.getSummaryModel()]);
+        for (const [name, base, selectId, hintId, current] of jobs) {
+          const hint = document.getElementById(hintId);
+          try {
+            const models = await OllamaClient.listModels(base);
+            this._fillModelSelect(selectId, models, current);
+            if (hint) hint.textContent = models.length
+              ? `本機模型（${models.length}）：${models.slice(0, 12).join('、')}${models.length > 12 ? '…' : ''}`
+              : '本機目前沒有已安裝的模型，請先執行 ollama pull。';
+          } catch (err) {
+            console.error(`讀取 Ollama（${name}）模型清單失敗：`, err);
+            this._fillModelSelect(selectId, [current], current);
+            if (hint) hint.textContent = '⚠️ 讀不到模型清單：' + err.message;
+          }
+        }
+      },
+      async refreshFwModels() {
+        const base = this.getFwBaseUrl();
+        try {
+          const models = await FasterWhisperClient.listModels(base);
+          this._fillModelSelect('sttFwModelSelect', models.length ? models : this.FW_MODEL_CHOICES, this.getFwModel());
+        } catch (err) {
+          console.warn('讀不到 FW 模型清單，改用內建清單：', err);
+          this._fillModelSelect('sttFwModelSelect', this.FW_MODEL_CHOICES, this.getFwModel());
+        }
+      },
+      _fillModelSelect(selectId, models, current) {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        const uniq = [...new Set([current, ...models].filter(Boolean))];
+        sel.innerHTML = uniq.map(m => `<option value="${Utils.escapeHtml(m)}">${Utils.escapeHtml(m)}</option>`).join('');
+        sel.value = current;
+      },
+      syncUI() {
+        const sttP = this.getSttProvider();
+        const sumP = this.getSummaryProvider();
+        const sttSel = document.getElementById('sttProviderSelect');
+        const sumSel = document.getElementById('summaryProviderSelect');
+        if (sttSel) sttSel.value = sttP;
+        if (sumSel) sumSel.value = sumP;
+        const sttOllamaRow = document.getElementById('sttOllamaModelRow');
+        const sttFwRow = document.getElementById('sttFwModelRow');
+        const sumRow = document.getElementById('summaryOllamaModelRow');
+        if (sttOllamaRow) sttOllamaRow.style.display = sttP === 'ollama' ? 'flex' : 'none';
+        if (sttFwRow) sttFwRow.style.display = sttP === 'fw' ? 'flex' : 'none';
+        if (sumRow) sumRow.style.display = sumP === 'ollama' ? 'flex' : 'none';
+        document.querySelectorAll('#sttProviderBtns button').forEach(b => {
+          b.classList.toggle('active', b.dataset.sttProvider === sttP);
+        });
+        document.querySelectorAll('#sumProviderBtns button').forEach(b => {
+          b.classList.toggle('active', b.dataset.sumProvider === sumP);
+        });
+        const fill = (id, val) => {
+          const el = document.getElementById(id);
+          if (el && document.activeElement !== el) el.value = val;
+        };
+        fill('ollamaSttBaseUrlInput', this.getSttBaseUrl());
+        fill('ollamaSttModelInput', this.getSttModel());
+        fill('ollamaSumBaseUrlInput', this.getSumBaseUrl());
+        fill('ollamaSumModelInput', this.getSummaryModel());
+        fill('fwBaseUrlInput', this.getFwBaseUrl());
+        fill('fwModelInput', this.getFwModel());
+        // 下拉若還沒填過模型清單，先用目前設定值佔位
+        this._fillModelSelect('sttOllamaModelSelect', [this.getSttModel()], this.getSttModel());
+        this._fillModelSelect('summaryOllamaModelSelect', [this.getSummaryModel()], this.getSummaryModel());
+        this._fillModelSelect('sttFwModelSelect', this.FW_MODEL_CHOICES, this.getFwModel());
+      }
+    };
+
+    // ---------- Ollama 本機呼叫（摘要／心智圖／轉寫）----------
+    // 全部走瀏覽器 fetch 直連使用者指定的 baseUrl，Key 不需要。
+    // 失敗訊息會明確指出是否為「連不上本機／跨域被擋／模型不支援語音」，
+    // 方便使用者自行排查，而非只顯示籠統的網路錯誤。
+    const OllamaClient = {
+      async listModels(baseUrl) {
+        const base = (baseUrl || AIProviderConfig.getBaseUrl()).replace(/\/+$/, '');
+        let res;
+        try {
+          res = await fetch(base + '/api/tags');
+        } catch (networkErr) {
+          throw new Error(`連不上 ${base}（${networkErr.message || networkErr.name}）。請確認 ollama serve 有啟動，且啟動時有設定 OLLAMA_ORIGINS 允許這個頁面的網域跨域存取。`);
+        }
+        if (!res.ok) throw new Error(`讀取模型清單失敗（HTTP ${res.status}）`);
+        let data;
+        try { data = await res.json(); }
+        catch (e) { throw new Error('模型清單回應不是 JSON 格式'); }
+        const models = (data.models || []).map(m => m.name).filter(Boolean);
+        return models;
+      },
+
+      _summarySystemPrompt(sourceNote) {
+        return '<role>\n' +
+          '你是一個會議記錄整理助手。請針對使用者在下方 <meeting_log> 標籤內提供的會議逐字稿進行分析與整理。\n' +
+          '</role>\n\n' +
+          '<demand>\n' +
+          '1. summary：第一行是 1-2 句話整體總結會議主題，換行後每個重點各自獨立一行，每行開頭用「・」，重點之間必須用換行字元分開，不可以把多個重點寫在同一行或同一段落裡。範例格式：這場會議討論了A與B兩個議題。（換行）・重點一的內容（換行）・重點二的內容。直接輸出整理結果，不需要額外的開場白或結語。\n' +
+          '2. actionItems：抽取逐字稿中明確提及的待辦事項、下一步行動或需要追蹤的事情。每一項包含 task（待辦內容）、owner（負責人）、deadline（期限）。owner 與 deadline 若逐字稿沒有明確指出，一律填 null，絕對不可以自行臆測或推論負責人與期限。如果逐字稿完全沒有提到任何待辦事項，回傳空陣列 []。\n' +
+          '3. sourceRefs：列出 summary 中每一個重點對應到逐字稿的哪一個【標籤】段落（若原始逐字稿沒有分段標籤，此欄位回傳空陣列 []）。每一項包含 point（摘要中的那一點文字，簡短即可）與 label（對應的段落標籤名稱）。\n' +
+          '4. 只根據 <meeting_log> 內的實際內容作答，不可自行補充或推論未提及的資訊。\n' +
+          (sourceNote || '') +
+          '\n只准回傳 JSON 物件（summary/actionItems/sourceRefs），不要加任何其他文字或程式碼區塊標記。\n</demand>\n';
+      },
+
+      _buildFullText(items) {
+        const hasMultipleItems = items.length > 1;
+        const fullText = items.map(item => {
+          const label = item.label || '（未命名）';
+          return hasMultipleItems ? `【${label}】\n${item.content}` : item.content;
+        }).join('\n\n');
+        const sourceNote = hasMultipleItems
+          ? '\n\n這份逐字稿是由多個段落合併而成（可能來自不同人分別整理、或同一場會議的不同時段），每個段落前面用【標籤】標示來源，已按照指定順序排列。請將其視為同一場會議或討論的完整內容，整合成單一份摘要，不需要逐段分別摘要或特別區分是誰整理的。'
+          : '';
+        return { fullText, sourceNote };
+      },
+
+      async _chat(base, model, systemText, userText, jsonMode) {
+        let res;
+        const body = {
+          model,
+          messages: [
+            { role: 'system', content: systemText },
+            { role: 'user', content: userText }
+          ],
+          stream: false,
+          options: { temperature: 0.2 }
+        };
+        if (jsonMode) body.format = 'json';
+        try {
+          res = await fetch(base + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+        } catch (networkErr) {
+          throw new Error(`連不上 Ollama（${base}）：${networkErr.message || networkErr.name}。請確認 ollama serve 有啟動＋OLLAMA_ORIGINS 允許跨域。`);
+        }
+        let data;
+        try { data = await res.json(); }
+        catch (e) { throw new Error(`Ollama 回應不是 JSON（HTTP ${res.status}）`); }
+        if (!res.ok) {
+          const msg = (data && data.error) || ('HTTP ' + res.status);
+          if (/not found|no such|does not exist|pull/i.test(String(msg))) {
+            throw new Error(`本機找不到模型「${model}」，請先執行 ollama pull ${model}：` + msg);
+          }
+          throw new Error(msg);
+        }
+        const text = data && data.message && data.message.content;
+        if (!text || !text.trim()) throw new Error('Ollama 回傳了空白結果，請換個模型或再試一次。');
+        return text.trim();
+      },
+
+      async summarize(items, opts) {
+        const base = (opts && opts.baseUrl) || AIProviderConfig.getSumBaseUrl();
+        const model = (opts && opts.model) || AIProviderConfig.getSummaryModel();
+        const { fullText, sourceNote } = this._buildFullText(items);
+        const text = await this._chat(base, model,
+          this._summarySystemPrompt(sourceNote),
+          `<meeting_log>\n${fullText}\n</meeting_log>`, true);
+        // Ollama 就算開了 format:json，偶爾仍會包一層說明文字，嘗試擷取第一個 {...}
+        let parsed = null;
+        try { parsed = JSON.parse(text); }
+        catch (e) {
+          const m = text.match(/\{[\s\S]*\}/);
+          if (m) { try { parsed = JSON.parse(m[0]); } catch (e2) { parsed = null; } }
+        }
+        if (parsed && typeof parsed === 'object') return parsed;
+        console.warn('Ollama 摘要回傳不是 JSON，改用純文字模式顯示：', text);
+        return text;
+      },
+
+      async mindmap(summaryText, opts) {
+        const base = (opts && opts.baseUrl) || AIProviderConfig.getSumBaseUrl();
+        const model = (opts && opts.model) || AIProviderConfig.getSummaryModel();
+        const systemText = '<role>\n你是一個心智圖整理助手。請針對使用者在下方 <summary_text> 標籤內提供的會議摘要文字，整理成階層式心智圖大綱。\n</role>\n\n' +
+          '<demand>\n1. 只根據 <summary_text> 裡的內容整理，不可額外補充摘要沒有提到的資訊，也不可遺漏摘要中的重點。\n' +
+          '2. 用 Markdown 格式輸出：第一行必須是 "# " 開頭的整體主題（作為心智圖的根節點），接下來每一層子項目都用清單並以縮排表示層級（每層用兩個半形空白縮排，"- " 開頭）。\n' +
+          '3. 最多三層、最多 25 個節點，避免內容過於冗長；把摘要中相關的重點歸納到同一個子主題下。\n' +
+          '4. 直接輸出心智圖大綱本身，不需要額外的開場白、結語或程式碼區塊標記。\n</demand>\n';
+        let outline = await this._chat(base, model, systemText, `<summary_text>\n${summaryText}\n</summary_text>`, false);
+        outline = outline.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+        if (!outline.startsWith('#')) {
+          const firstLine = outline.split('\n')[0].replace(/^[-*]\s*/, '');
+          outline = `# ${firstLine}\n` + outline;
+        }
+        return outline;
+      },
+
+      // 摘要翻譯：輸入已生成的摘要純文字（摘要＋待辦），輸出譯文。
+      // 走摘要用的同一組 baseUrl／model，不另開設定。
+      async translate(text, opts, langLabel) {
+        const base = (opts && opts.baseUrl) || AIProviderConfig.getSumBaseUrl();
+        const model = (opts && opts.model) || AIProviderConfig.getSummaryModel();
+        const systemText = '你是一個專業翻譯助手。請把使用者在 <source_text> 標籤內的會議摘要全文翻譯成' +
+          (langLabel || '繁體中文') +
+          '。只輸出譯文本身，不要加開場白、結語或程式碼區塊標記；保留原文的換行與條列格式；人名、產品名等專有名詞若無通用譯名可保留原文。';
+        const out = await this._chat(base, model, systemText, `<source_text>\n${text}\n</source_text>`, false);
+        return out.replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+      },
+
+      // ---- 語音轉文字 ----
+      // 策略：先試 OpenAI 相容端點 /v1/audio/transcriptions（本機 whisper
+      // 類模型適用，一次送整個檔案）；若該端點不存在（404/405）則退回
+      // /api/chat 多模態（把 WAV base64 放在 images 欄位，音訊模型適用）。
+      // 送之前一律把 MediaRecorder 的 webm 轉成 16kHz 單聲道 WAV：
+      // 聊天式音訊模型多半只認得帶 RIFF 檔頭的 WAV，直接送 webm 會被
+      // 誤判成圖片而無聲失敗。
+      async transcribe(blob, opts) {
+        const base = ((opts && opts.baseUrl) || AIProviderConfig.getSttBaseUrl()).replace(/\/+$/, '');
+        const model = (opts && opts.model) || AIProviderConfig.getSttModel();
+        const fileName = (opts && opts.fileName) || 'recording.webm';
+        const prompt = (opts && opts.prompt) || 'Transcribe the audio exactly as spoken. Output only the spoken words.';
+        // 先試 OpenAI 相容端點
+        try {
+          const text = await this._transcribeOpenAICompat(base, model, blob, fileName, prompt, opts);
+          if (text !== null) return text;
+        } catch (err) {
+          // 明確的模型/參數錯誤直接往上拋，不再 fallback，避免把真正的
+          // 錯誤訊息蓋掉；只有「端點不存在」才退回聊天式轉寫
+          if (err && err._noFallback) throw err;
+          console.warn('OpenAI 相容轉寫端點不可用，改試 /api/chat 多模態：', err);
+        }
+        return this._transcribeViaChat(base, model, blob, prompt);
+      },
+
+      async _transcribeOpenAICompat(base, model, blob, fileName, prompt, opts) {
+        const form = new FormData();
+        form.append('model', model);
+        form.append('file', blob, fileName);
+        if (opts && opts.languageCode) form.append('language', opts.languageCode);
+        if (prompt) form.append('prompt', prompt);
+        let res;
+        try {
+          res = await fetch(base + '/v1/audio/transcriptions', { method: 'POST', body: form });
+        } catch (networkErr) {
+          const err = new Error(`連不上 Ollama（${base}）：${networkErr.message || networkErr.name}。請確認 ollama serve 有啟動＋OLLAMA_ORIGINS 允許跨域。`);
+          err._noFallback = true;
+          throw err;
+        }
+        if (res.status === 404 || res.status === 405) return null; // 端點不存在 → fallback
+        let data = null;
+        const ct = res.headers.get('content-type') || '';
+        try { data = ct.includes('json') ? await res.json() : { text: await res.text() }; }
+        catch (e) { throw Object.assign(new Error(`轉寫回應解析失敗（HTTP ${res.status}）`), { _noFallback: true }); }
+        if (!res.ok) {
+          const msg = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+          const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+          // 模型不存在、格式不支援等都是實質錯誤，不 fallback
+          err._noFallback = true;
+          // 常見陷阱：拿純文字模型（如 qwen2.5-omni:7b）來轉寫
+          if (/not found|no such|does not exist|pull/i.test(String(msg))) {
+            err.message = `本機找不到模型「${model}」，請先執行 ollama pull ${model}：` + err.message;
+          }
+          throw err;
+        }
+        const text = (data && (data.text || data.transcript)) || '';
+        // 語言偵測回傳（若有）交給 LanguageManager 顯示
+        if (data && data.language && typeof LanguageManager !== 'undefined') {
+          try { LanguageManager.onDetectedLanguageOllama(data.language); } catch (e) {}
+        }
+        return text;
+      },
+
+      async _transcribeViaChat(base, model, blob, prompt) {
+        const wavBlob = await this._toWav16kMono(blob);
+        const b64 = await this._blobToBase64(wavBlob);
+        let res;
+        try {
+          res = await fetch(base + '/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model,
+              stream: false,
+              options: { temperature: 0 },
+              messages: [{
+                role: 'user',
+                content: prompt || 'Transcribe the audio exactly as spoken. Output only the spoken words.',
+                images: [b64]
+              }]
+            })
+          });
+        } catch (networkErr) {
+          throw new Error(`連不上 Ollama（${base}）：${networkErr.message || networkErr.name}。請確認 ollama serve 有啟動＋OLLAMA_ORIGINS 允許跨域。`);
+        }
+        let data;
+        try { data = await res.json(); }
+        catch (e) { throw new Error(`Ollama 回應不是 JSON（HTTP ${res.status}）`); }
+        if (!res.ok) {
+          const msg = (data && data.error) || ('HTTP ' + res.status);
+          if (/not found|no such|does not exist|pull/i.test(String(msg))) {
+            throw new Error(`本機找不到模型「${model}」，請先執行 ollama pull ${model}：` + msg);
+          }
+          // 純文字模型收到 images 時常見的拒絕訊息，翻成白話提醒
+          if (/image|vision|multimodal|audio|support/i.test(String(msg))) {
+            throw new Error(`模型「${model}」不支援語音輸入（${msg}）。轉寫請改用 whisper／qwen2.5-omni／qwen3-omni／gemma3n 等支援語音的模型。`);
+          }
+          throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        }
+        const text = data && data.message && data.message.content;
+        if (!text || !text.trim()) {
+          throw new Error(`模型「${model}」沒有回傳轉寫文字（可能是純文字模型聽不懂語音）。請改用支援語音的模型後再試。`);
+        }
+        return text.trim();
+      },
+
+      async _toWav16kMono(blob) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return blob;
+        const buf = await blob.arrayBuffer();
+        const ctx = new AudioCtx();
+        try {
+          const decoded = await ctx.decodeAudioData(buf.slice(0));
+          const targetRate = 16000;
+          const ch = decoded.getChannelData(0);
+          const ratio = decoded.sampleRate / targetRate;
+          const newLen = Math.floor(ch.length / ratio);
+          const resampled = new Float32Array(newLen);
+          for (let i = 0; i < newLen; i++) resampled[i] = ch[Math.floor(i * ratio)] || 0;
+          return this._encodeWav(resampled, targetRate);
+        } finally {
+          try { ctx.close(); } catch (e) {}
+        }
+      },
+
+      _encodeWav(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeStr = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
+        writeStr(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeStr(8, 'WAVE');
+        writeStr(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        for (let i = 0; i < samples.length; i++) {
+          const s = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+        }
+        return new Blob([buffer], { type: 'audio/wav' });
+      },
+
+      _blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result || '';
+            const comma = dataUrl.indexOf(',');
+            resolve(comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl);
+          };
+          reader.onerror = () => reject(new Error('音檔 base64 轉換失敗'));
+          reader.readAsDataURL(blob);
+        });
+      }
+    };
+
+    // ---------- 地端 Faster-Whisper 轉寫 ----------
+    // 優先走 OpenAI 相容端點 POST {base}/v1/audio/transcriptions
+    // （multipart：file／model／language／prompt），多數
+    // faster-whisper server 都有提供；若該端點不存在（404/405），
+    // 自動改試舊式 whisper-asr-webservice 的 POST {base}/asr。
+    // 回傳一律用 _extractText() 寬鬆解析（text／transcription／
+    // segments 陣列），避免不同實作的欄位差異導致失敗。
+    const FasterWhisperClient = {
+      async listModels(baseUrl) {
+        const base = (baseUrl || AIProviderConfig.getFwBaseUrl()).replace(/\/+$/, '');
+        let res;
+        try {
+          res = await fetch(base + '/v1/models');
+        } catch (networkErr) {
+          throw new Error(`連不上 ${base}（${networkErr.message || networkErr.name}）。請確認 Faster-Whisper 服務已啟動，且有開 CORS（瀏覽器直連需要）＋防火牆沒有擋 port。`);
+        }
+        if (!res.ok) throw new Error(`服務有回應但讀不到模型清單（HTTP ${res.status}），請手動填模型名稱。`);
+        let data = null;
+        try { data = await res.json(); } catch (e) { throw new Error('模型清單不是 JSON 格式，請手動填模型名稱。'); }
+        const arr = (data && (data.data || data.models)) || [];
+        return (Array.isArray(arr) ? arr : []).map(m => (m && (m.id || m.name)) || '').filter(Boolean);
+      },
+
+      async transcribe(blob, opts) {
+        const base = ((opts && opts.baseUrl) || AIProviderConfig.getFwBaseUrl()).replace(/\/+$/, '');
+        const model = (opts && opts.model) || AIProviderConfig.getFwModel();
+        const fileName = (opts && opts.fileName) || 'recording.webm';
+        const errors = [];
+        // 1. OpenAI 相容（faster-whisper-server、pfrankov 系等）
+        try {
+          const text = await this._transcribeOpenAICompat(base, model, blob, fileName, opts);
+          if (text !== null) return text;
+        } catch (err) {
+          if (err && err._noFallback) throw err;
+          console.warn('FW OpenAI 相容端點不可用，改試 /asr：', err);
+          errors.push(err);
+        }
+        // 2. 舊式 whisper-asr-webservice
+        try {
+          return await this._transcribeLegacyAsr(base, model, blob, fileName, opts);
+        } catch (err) {
+          console.warn('FW /asr 不可用，改試 whisper.cpp /inference：', err);
+          errors.push(err);
+        }
+        // 3. whisper.cpp（whisper-server）：模型由啟動參數 -m 決定
+        try {
+          const text = await this._transcribeWhisperCpp(base, blob, fileName, opts);
+          if (text !== null) return text;
+        } catch (err) {
+          errors.push(err);
+        }
+        throw errors[0] || new Error('三種轉寫端點（/v1/audio/transcriptions、/asr、/inference）都失敗，請確認服務種類與位址。');
+      },
+
+      async _transcribeOpenAICompat(base, model, blob, fileName, opts) {
+        const form = new FormData();
+        form.append('file', blob, fileName);
+        form.append('model', model);
+        if (opts && opts.languageCode) form.append('language', opts.languageCode);
+        if (opts && opts.prompt) form.append('prompt', opts.prompt);
+        form.append('response_format', 'verbose_json');
+        let res;
+        try {
+          res = await fetch(base + '/v1/audio/transcriptions', { method: 'POST', body: form });
+        } catch (networkErr) {
+          const err = new Error(`連不上 Faster-Whisper（${base}）：${networkErr.message || networkErr.name}。請確認服務已啟動＋有開 CORS。`);
+          err._noFallback = true;
+          throw err;
+        }
+        if (res.status === 404 || res.status === 405) return null;
+        let data = null;
+        try { data = await res.json(); }
+        catch (e) {
+          const err = new Error(`轉寫回應解析失敗（HTTP ${res.status}）`);
+          err._noFallback = true;
+          throw err;
+        }
+        if (!res.ok) {
+          const msg = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+          const err = new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+          err._noFallback = true;
+          throw err;
+        }
+        if (data && data.language && typeof LanguageManager !== 'undefined') {
+          try { LanguageManager.onDetectedLanguageOllama(data.language); } catch (e) {}
+        }
+        return this._extractText(data);
+      },
+
+      async _transcribeLegacyAsr(base, model, blob, fileName, opts) {
+        const params = new URLSearchParams({ task: 'transcribe', output: 'json' });
+        if (opts && opts.languageCode) params.set('language', opts.languageCode);
+        // 部分實作用 model 參數切換模型，沒有就忽略
+        if (model) params.set('model', model);
+        const form = new FormData();
+        form.append('audio_file', blob, fileName);
+        let res;
+        try {
+          res = await fetch(base + '/asr?' + params.toString(), { method: 'POST', body: form });
+        } catch (networkErr) {
+          throw new Error(`連不上 Faster-Whisper（${base}）：${networkErr.message || networkErr.name}。請確認服務已啟動＋有開 CORS。`);
+        }
+        let data = null;
+        try { data = await res.json(); }
+        catch (e) { throw new Error(`轉寫回應解析失敗（HTTP ${res.status}）。若服務只有 /v1/audio/transcriptions，請確認該端點可用。`); }
+        if (!res.ok) {
+          const msg = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+          throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        }
+        return this._extractText(data);
+      },
+
+      // whisper.cpp（whisper-server）：POST {base}/inference，
+      // multipart 欄位固定叫 `file`，response_format=json 回 {"text"}。
+      // 注意：沒開 ffmpeg 轉換的版本只吃 WAV，所以一律先轉成 16k
+      // 單聲道 WAV 再送，各版本通用；檔名也改成 .wav 結尾。
+      // 模型由伺服器啟動參數 -m 決定，這裡不送 model。
+      async _transcribeWhisperCpp(base, blob, fileName, opts) {
+        let wav = blob;
+        try {
+          if (typeof OllamaClient !== 'undefined' && OllamaClient._toWav16kMono) {
+            wav = await OllamaClient._toWav16kMono(blob);
+          }
+        } catch (e) {
+          console.warn('轉 WAV 失敗，改送原始音檔：', e);
+        }
+        const wavName = (fileName || 'recording').replace(/\.[^.]+$/, '') + '.wav';
+        const form = new FormData();
+        form.append('file', wav, wavName);
+        form.append('temperature', '0.0');
+        form.append('response_format', 'json');
+        if (opts && opts.languageCode) form.append('language', opts.languageCode);
+        if (opts && opts.prompt) form.append('prompt', opts.prompt);
+        let res;
+        try {
+          res = await fetch(base + '/inference', { method: 'POST', body: form });
+        } catch (networkErr) {
+          throw new Error(`連不上轉寫服務（${base}）：${networkErr.message || networkErr.name}。`);
+        }
+        if (res.status === 404 || res.status === 405) return null;
+        const ct = res.headers.get('content-type') || '';
+        let text = '';
+        try {
+          if (ct.includes('json')) {
+            const data = await res.json();
+            if (data && data.language && typeof LanguageManager !== 'undefined') {
+              try { LanguageManager.onDetectedLanguageOllama(data.language); } catch (e) {}
+            }
+            text = this._extractText(data);
+          } else {
+            text = (await res.text() || '').trim();
+          }
+        } catch (e) {
+          throw new Error(`轉寫回應解析失敗（HTTP ${res.status}）`);
+        }
+        if (!res.ok) throw new Error(text || ('HTTP ' + res.status));
+        return text;
+      },
+
+      _extractText(data) {
+        if (!data) return '';
+        if (typeof data === 'string') return data;
+        if (typeof data.text === 'string' && data.text.trim()) return data.text;
+        if (typeof data.transcription === 'string' && data.transcription.trim()) return data.transcription;
+        const segs = Array.isArray(data) ? data : data.segments;
+        if (Array.isArray(segs)) {
+          return segs.map(s => (typeof s === 'string' ? s : (s && s.text)) || '').join('').trim();
+        }
+        return '';
+      }
+    };
+
+    // ---------- 共用 API Key：伺服器 api.json ----------
+    // 「儲存」把 Groq／Gemini Key 池＋服務選擇＋地端位址／模型打包成
+    // JSON PUT 到同目錄的 api.json；「載入」則讀回來套用。
+    // 注意：純靜態主機收不到 PUT／POST，save() 會失敗並提示改用下載
+    // 後手動上傳；api.json 內容公開可讀，只適合信任的內網。
+    const ServerKeySync = {
+      FILE: 'api.json',
+
+      _hintEl() { return document.getElementById('serverKeySyncHint'); },
+      _setHint(text) { const el = this._hintEl(); if (el) el.textContent = text; },
+
+      buildDoc() {
+        return {
+          version: 1,
+          updatedAt: new Date().toISOString(),
+          app: 'voice-card-notes',
+          groq: KeyPoolManager.exportPool('groq'),
+          gemini: KeyPoolManager.exportPool('gemini'),
+          sttProvider: AIProviderConfig.getSttProvider(),
+          summaryProvider: AIProviderConfig.getSummaryProvider(),
+          ollamaStt: { baseUrl: AIProviderConfig.getSttBaseUrl(), model: AIProviderConfig.getSttModel() },
+          ollamaSum: { baseUrl: AIProviderConfig.getSumBaseUrl(), model: AIProviderConfig.getSummaryModel() },
+          fasterWhisper: { baseUrl: AIProviderConfig.getFwBaseUrl(), model: AIProviderConfig.getFwModel() }
+        };
+      },
+
+      // 空池不視為錯誤：略過該池（本機保留原值），只套用有的部分；
+      // 整份文件完全沒有可用內容才拋錯。回傳套用摘要供 load() 顯示。
+      _hasUsableKeys(poolData) {
+        return !!(poolData && Array.isArray(poolData.keys) &&
+          poolData.keys.some(k => k && typeof k.value === 'string' && k.value.trim()));
+      },
+
+      applyDoc(doc) {
+        if (!doc || typeof doc !== 'object') throw new Error('api.json 格式錯誤，無法套用。');
+        const skipped = [];
+        let appliedKeys = 0;
+        if (this._hasUsableKeys(doc.groq)) {
+          KeyPoolManager.importPool('groq', doc.groq);
+          appliedKeys++;
+        } else if (doc.groq) {
+          skipped.push('Groq Key（伺服器上是空的，已保留本機原值）');
+        }
+        if (this._hasUsableKeys(doc.gemini)) {
+          KeyPoolManager.importPool('gemini', doc.gemini);
+          appliedKeys++;
+        } else if (doc.gemini) {
+          skipped.push('Gemini Key（伺服器上是空的，已保留本機原值）');
+        }
+        let appliedSettings = false;
+        const touchSettings = () => { appliedSettings = true; };
+        if (doc.sttProvider) { AIProviderConfig.setSttProvider(doc.sttProvider); touchSettings(); }
+        if (doc.summaryProvider) { AIProviderConfig.setSummaryProvider(doc.summaryProvider); touchSettings(); }
+        if (doc.ollamaStt) {
+          if (doc.ollamaStt.baseUrl) { AIProviderConfig.setSttBaseUrl(doc.ollamaStt.baseUrl); touchSettings(); }
+          if (doc.ollamaStt.model) { AIProviderConfig.setSttModel(doc.ollamaStt.model); touchSettings(); }
+        }
+        if (doc.ollamaSum) {
+          if (doc.ollamaSum.baseUrl) { AIProviderConfig.setSumBaseUrl(doc.ollamaSum.baseUrl); touchSettings(); }
+          if (doc.ollamaSum.model) { AIProviderConfig.setSummaryModel(doc.ollamaSum.model); touchSettings(); }
+        }
+        if (doc.fasterWhisper) {
+          if (doc.fasterWhisper.baseUrl) { AIProviderConfig.setFwBaseUrl(doc.fasterWhisper.baseUrl); touchSettings(); }
+          if (doc.fasterWhisper.model) { AIProviderConfig.setFwModel(doc.fasterWhisper.model); touchSettings(); }
+        }
+        if (appliedKeys === 0 && !appliedSettings) {
+          throw new Error('api.json 裡沒有可用的內容（Key 皆為空，也沒有服務設定）。');
+        }
+        KeyPoolPanel.render('groq');
+        KeyPoolPanel.render('gemini');
+        AIProviderConfig.syncUI();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+        return { appliedKeys, skipped };
+      },
+
+      // 進設定頁／進站時呼叫：只檢查檔案在不在，不自動覆蓋本機資料
+      async check() {
+        try {
+          const res = await fetch(this.FILE, { cache: 'no-store' });
+          if (!res.ok) {
+            this._setHint('伺服器上目前沒有 api.json（可按「儲存到伺服器」建立，或用「下載」手動上傳）。');
+            return false;
+          }
+          let doc = null;
+          try { doc = await res.json(); } catch (e) { /* 內容壞掉也只提示 */ }
+          const when = doc && doc.updatedAt ? `（更新於 ${String(doc.updatedAt).slice(0, 16).replace('T', ' ')}）` : '';
+          this._setHint(`✅ 伺服器上有共用的 api.json${when}，可按「從伺服器載入」套用。`);
+          return true;
+        } catch (e) {
+          this._setHint('尚未檢查伺服器上的 api.json（可能為 file:// 開啟，無法讀取伺服器檔案）。');
+          return false;
+        }
+      },
+
+      async load() {
+        this._setHint('正在從伺服器載入 api.json...');
+        try {
+          const res = await fetch(this.FILE, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`讀取失敗（HTTP ${res.status}）。請確認 api.json 已放在跟本頁同一目錄。`);
+          const doc = await res.json();
+          if (!confirm('確定要用伺服器 api.json 的內容覆蓋本機的 Key 池與服務設定嗎？此動作無法復原。')) {
+            this.check();
+            return;
+          }
+          const result = this.applyDoc(doc);
+          const skipNote = result.skipped.length ? '\n\n略過（本機保留原值）：\n- ' + result.skipped.join('\n- ') : '';
+          this._setHint('✅ 已從伺服器載入並套用。' + (result.skipped.length ? `（略過 ${result.skipped.length} 項空 Key）` : ''));
+          alert('已從伺服器載入共用設定並套用。' + skipNote);
+        } catch (err) {
+          console.error('載入 api.json 失敗：', err);
+          this._setHint('❌ ' + err.message);
+          alert('載入失敗：' + err.message);
+        }
+      },
+
+      async save() {
+        const doc = this.buildDoc();
+        // 防呆：兩邊 Key 池都空的時候先問，避免存出別人載入會困惑的檔
+        if (doc.groq.keys.length === 0 && doc.gemini.keys.length === 0) {
+          const proceed = confirm('目前 Groq／Gemini Key 池都是空的，存上去的 api.json 別人載入時 Key 部分會被略過（只會共用到服務選擇與位址）。\n\n仍要儲存嗎？');
+          if (!proceed) {
+            this._setHint('已取消儲存（Key 池是空的，可先加 Key 或改用「下載」備份設定）。');
+            return;
+          }
+        }
+        const body = JSON.stringify(doc, null, 2);
+        this._setHint('正在儲存到伺服器 api.json...');
+        // 先試 PUT（常見靜態＋WebDAV／簡易 API 接受），不行再試 POST
+        for (const method of ['PUT', 'POST']) {
+          try {
+            const res = await fetch(this.FILE, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body
+            });
+            if (res.ok) {
+              this._setHint(`✅ 已儲存到伺服器 api.json（${method}）。`);
+              alert('已儲存到伺服器 api.json，其他裝置可按「從伺服器載入」共用。');
+              return;
+            }
+          } catch (e) { /* 連不上就換下一個方法試 */ }
+        }
+        this._setHint('❌ 伺服器不接受寫入（純靜態主機常見）。請改按「下載 api.json」再手動放到伺服器同一目錄。');
+        alert('儲存失敗：伺服器不接受寫入（HTTP 方法被拒或無後端）。\n\n請改按「下載 api.json」，再手動把檔案放到伺服器跟本頁同一目錄，即可共用。');
+      },
+
+      download() {
+        try {
+          const blob = new Blob([JSON.stringify(this.buildDoc(), null, 2)], { type: 'application/json;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = this.FILE;
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+          this._setHint('已下載 api.json，請放到伺服器跟本頁同一目錄即可共用。');
+        } catch (e) {
+          alert('下載失敗：' + (e.message || e));
+        }
+      }
+    };
+
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-keypool-mindmap';
+    const APP_VERSION = '2026-09-german';
 
     const IntroModal = {
       switchTab(tab) {
@@ -1692,6 +2921,44 @@
 
         this._persist(type);
         return { switched: false, newActiveLabel: null, failedLabel, mode };
+      },
+
+      // ---- 伺服器共用（api.json）用的匯出／匯入 ----
+      // 匯出只帶 label＋value（不帶本機的 id 與失效狀態，失效狀態是
+      // 這台裝置的判斷，不該散播到別台）；匯入時核對上限並重建 id，
+      // 狀態一律回到 ok，整池取代本機內容。
+      exportPool(type) {
+        const pool = this._load(type);
+        return {
+          keys: pool.keys.map(k => ({ label: k.label, value: k.value })),
+          activeLabel: (pool.keys.find(k => k.id === pool.activeId) || {}).label || null,
+          switchMode: pool.switchMode
+        };
+      },
+
+      importPool(type, data) {
+        if (!data || !Array.isArray(data.keys)) {
+          throw new Error(`api.json 裡沒有可用的 ${type === 'groq' ? 'Groq' : 'Gemini'} Key。`);
+        }
+        const keys = data.keys
+          .filter(k => k && typeof k.value === 'string' && k.value.trim())
+          .slice(0, this.LIMITS[type])
+          .map(k => ({
+            id: this._genId(),
+            label: (k.label || '').trim() || '共用 Key',
+            value: k.value.trim(),
+            status: 'ok'
+          }));
+        if (keys.length === 0) {
+          throw new Error('api.json 裡沒有可用的 Key（內容皆為空）。');
+        }
+        const active = keys.find(k => k.label === data.activeLabel) || keys[0];
+        this._pools[type] = {
+          keys,
+          activeId: active.id,
+          switchMode: data.switchMode === 'auto' ? 'auto' : 'manual'
+        };
+        this._persist(type);
       }
     };
 
@@ -1875,6 +3142,12 @@
           localStorage.removeItem('intro_modal_seen_version');
           localStorage.removeItem('record_notice_acknowledged');
           localStorage.removeItem(SUMMARY_STORAGE_KEY);
+          try { localStorage.removeItem(FILE_TRANS_STORAGE_KEY); } catch (e) {}
+          // 服務偏好（供應商／位址／模型）一併清除，回到預設值
+          ['ai_stt_provider', 'ai_summary_provider', 'ollama_base_url',
+           'ollama_stt_base_url', 'ollama_sum_base_url', 'ollama_stt_model',
+           'ollama_summary_model', 'fw_base_url', 'fw_stt_model'
+          ].forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
           // 分享斷點依附於卡片內容，卡片清空後這筆記錄會變孤兒資料，一併清除
           localStorage.removeItem(SHARE_RESUME_STORAGE_KEY);
           sessionStorage.removeItem('pending_send_text');
@@ -2057,19 +3330,50 @@
       }
     };
 
-    // API Key 缺漏提示條，只在對應 Key 未設定時顯示
+    // API Key／服務缺漏提示條：依目前選擇的供應商決定要檢查什麼。
+    // STT=groq 才需要 Groq Key；STT=ollama 只需要有填模型；
+    // STT=fw 只需要有填位址與模型（免 Key）。
+    // 摘要=gemini 才需要 Gemini Key；摘要=ollama 只需要有填模型。
     function updateKeyMissingHints() {
+      const sttProvider = (typeof AIProviderConfig !== 'undefined') ? AIProviderConfig.getSttProvider() : 'groq';
+      const sumProvider = (typeof AIProviderConfig !== 'undefined') ? AIProviderConfig.getSummaryProvider() : 'gemini';
       const hasGroqKey = !!KeyPoolManager.getActiveKeyValue('groq');
       const hasGeminiKey = !!KeyPoolManager.getActiveKeyValue('gemini');
 
       const recordHint = document.getElementById('recordKeyMissingHint');
       const summaryHint = document.getElementById('summaryKeyMissingHint');
-      if (recordHint) recordHint.classList.toggle('hidden', hasGroqKey);
-      if (summaryHint) summaryHint.classList.toggle('hidden', hasGeminiKey);
+      let sttReady = false;
+      let sttHintText = '';
+      if (sttProvider === 'ollama') {
+        sttReady = !!AIProviderConfig.getSttModel();
+        sttHintText = '🖥️ 尚未設定 Ollama（辨識用）轉寫模型，點此前往設定';
+      } else if (sttProvider === 'fw') {
+        sttReady = !!AIProviderConfig.getFwBaseUrl() && !!AIProviderConfig.getFwModel();
+        sttHintText = '🎯 尚未設定 Faster-Whisper 位址或模型，點此前往設定';
+      } else {
+        sttReady = hasGroqKey;
+        sttHintText = '🔑 尚未設定 Groq API Key（或改切免 Key 的地端服務），點此前往設定';
+      }
+      const sumReady = sumProvider === 'ollama' ? !!AIProviderConfig.getSummaryModel() : hasGeminiKey;
+      if (recordHint) {
+        recordHint.classList.toggle('hidden', sttReady);
+        if (!sttReady) recordHint.textContent = sttHintText;
+      }
+      if (summaryHint) {
+        summaryHint.classList.toggle('hidden', sumReady);
+        if (!sumReady) summaryHint.textContent = '🔑 尚未設定 Gemini API Key（或改切免 Key 的本機 Ollama），點此前往設定';
+      }
+      // 文件翻譯共用摘要服務的設定，就緒條件跟摘要相同
+      const fileHint = document.getElementById('fileKeyMissingHint');
+      if (fileHint) {
+        fileHint.classList.toggle('hidden', sumReady);
+        if (!sumReady) fileHint.textContent = '🔑 尚未設定 AI 服務（文件翻譯共用摘要設定），點此前往設定';
+      }
+      if (typeof AIProviderConfig !== 'undefined') AIProviderConfig.syncUI();
     }
     updateKeyMissingHints();
 
-    // 主導覽 5 分頁切換。action-bar 只在「筆記」分頁顯示，因為那是
+    // 主導覽 6 分頁切換。action-bar 只在「筆記」分頁顯示，因為那是
     // 唯一該被發送的內容來源——共享筆記是別人的資料，摘要有專屬
     // 複製/分享按鈕，設定頁不需要發送。
     const MainNav = {
@@ -2078,7 +3382,7 @@
       switchTo(tab) {
         this.current = tab;
 
-        const tabs = ['record', 'cards', 'shared', 'summary', 'settings'];
+        const tabs = ['record', 'cards', 'shared', 'summary', 'file', 'settings'];
         tabs.forEach(t => {
           const btn = document.getElementById('navTab' + this._capitalize(t));
           const panel = document.getElementById('navPanel' + this._capitalize(t));
@@ -2094,8 +3398,14 @@
         if (tab === 'summary' && typeof SummaryModule !== 'undefined') {
           SummaryModule.renderPool();
         }
+        if (tab === 'file' && typeof FileTransModule !== 'undefined') {
+          FileTransModule.refresh();
+        }
         if (tab === 'settings' && typeof SettingsPanel !== 'undefined') {
           SettingsPanel.render();
+          if (typeof ServerKeySync !== 'undefined') {
+            try { ServerKeySync.check(); } catch (e) {}
+          }
         }
       },
 
@@ -2964,7 +4274,9 @@
 
     const SummaryModule = {
       GEMINI_MODEL: 'gemini-3.5-flash',
+      TRANSLATE_LANGS: { zh: '繁體中文', en: 'English', ja: '日本語', ko: '한국어', de: 'Deutsch' },
       isGenerating: false,
+      _isTranslating: false,
       currentSummary: null,
 
       // 生成前預覽 SelectionPool 目前內容，提供移除入口
@@ -3020,8 +4332,8 @@
         }
 
         const apiKey = KeyPoolManager.getActiveKeyValue('gemini');
-        if (!apiKey) {
-          alert('請先到「⚙️ 設定」分頁填入 Gemini API Key，才能使用 AI 摘要功能。');
+        if (!apiKey && AIProviderConfig.getSummaryProvider() !== 'ollama') {
+          alert('目前摘要服務是「Gemini 雲端」，請先到「⚙️ 設定」分頁填入 Gemini API Key（或把摘要服務切成「本機 Ollama」即可免 Key）。');
           return;
         }
 
@@ -3029,7 +4341,13 @@
         this._setLoadingUI(true);
 
         try {
-          const summaryData = await this._callGemini(items, apiKey);
+          let summaryData;
+          if (AIProviderConfig.getSummaryProvider() === 'ollama') {
+            const raw = await OllamaClient.summarize(items);
+            summaryData = this._normalizeSummaryData(raw);
+          } else {
+            summaryData = await this._callGemini(items, apiKey);
+          }
           this._renderSummary(summaryData);
           this._persist(summaryData);
         } catch (err) {
@@ -3204,17 +4522,20 @@
       // 資料）一律轉成同一內部形狀，其他函式不用各自判斷型別
       _normalizeSummaryData(raw) {
         if (typeof raw === 'string') {
-          return { summary: raw, actionItems: [], mindmapOutline: '', sourceRefs: [] };
+          return { summary: raw, actionItems: [], mindmapOutline: '', sourceRefs: [], translation: null };
         }
         if (raw && typeof raw === 'object') {
+          const tr = raw.translation;
           return {
             summary: typeof raw.summary === 'string' ? raw.summary : '',
             actionItems: Array.isArray(raw.actionItems) ? raw.actionItems.filter(it => it && typeof it.task === 'string') : [],
             mindmapOutline: typeof raw.mindmapOutline === 'string' ? raw.mindmapOutline : '',
-            sourceRefs: Array.isArray(raw.sourceRefs) ? raw.sourceRefs.filter(r => r && typeof r.point === 'string' && typeof r.label === 'string') : []
+            sourceRefs: Array.isArray(raw.sourceRefs) ? raw.sourceRefs.filter(r => r && typeof r.point === 'string' && typeof r.label === 'string') : [],
+            translation: (tr && typeof tr.lang === 'string' && typeof tr.text === 'string' && tr.text)
+              ? { lang: tr.lang, text: tr.text } : null
           };
         }
-        return { summary: '', actionItems: [], mindmapOutline: '', sourceRefs: [] };
+        return { summary: '', actionItems: [], mindmapOutline: '', sourceRefs: [], translation: null };
       },
 
       // 心智圖以「已生成的摘要文字」為輸入而非原始逐字稿，確保心智圖
@@ -3309,7 +4630,82 @@
         return outline;
       },
 
+      // Gemini 翻譯：純文字輸出，不用 responseSchema。錯誤處理
+      // （Key 失效／額度）沿用跟心智圖同一套規則。
+      async _callGeminiTranslate(sourceText, apiKey, langLabel) {
+        const modelName = this.GEMINI_MODEL || 'gemini-2.5-flash';
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+
+        const payload = {
+          systemInstruction: {
+            parts: [{
+              text: '你是一個專業翻譯助手。請把使用者在 <source_text> 標籤內的會議摘要全文翻譯成' +
+                (langLabel || '繁體中文') +
+                '。只輸出譯文本身，不要加開場白、結語或程式碼區塊標記；保留原文的換行與條列格式；人名、產品名等專有名詞若無通用譯名可保留原文。'
+            }]
+          },
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `<source_text>\n${sourceText}\n</source_text>`
+            }]
+          }]
+        };
+
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch (networkErr) {
+          throw new Error('無法連線到 Gemini 伺服器，請檢查網路連線：' + networkErr.message);
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          throw new Error('Gemini 回應格式異常，無法解析（HTTP ' + res.status + '）');
+        }
+
+        if (!res.ok) {
+          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          const isInvalidKey = (res.status === 400 && /API key not valid/i.test(apiMessage))
+            || res.status === 401 || res.status === 403;
+          const isQuotaExceeded = res.status === 429;
+          if (isInvalidKey) {
+            KeyPoolPanel.notifyFailure('gemini', 'invalid', 'Gemini');
+          } else if (isQuotaExceeded) {
+            KeyPoolPanel.notifyFailure('gemini', 'quota_exceeded', 'Gemini');
+          }
+          throw new Error(apiMessage);
+        }
+
+        const candidate = data && data.candidates && data.candidates[0];
+        if (!candidate) {
+          throw new Error('Gemini 沒有回傳任何結果，請稍後再試一次。');
+        }
+        if (candidate.finishReason === 'SAFETY') {
+          throw new Error('這段內容被 Gemini 的安全機制擋下，無法翻譯。');
+        }
+
+        const parts = candidate.content && candidate.content.parts;
+        const text = parts ? parts.map(p => p.text).join('') : '';
+
+        if (!text || !text.trim()) {
+          throw new Error('Gemini 回傳了空白結果，請稍後再試一次。');
+        }
+        return text.trim().replace(/^```[a-zA-Z]*\n?/, '').replace(/```$/, '').trim();
+      },
+
       _renderSummary(data) {
+        // 新摘要產生後，舊譯文已對應不到新內容，直接清空避免誤用
+        if (data && typeof data === 'object') data.translation = null;
         this.currentSummary = data;
         this._renderCurrentUI();
       },
@@ -3395,6 +4791,7 @@
         this._renderActionItems(data);
         this._renderMindmap(data);
         this._renderResultTabsAvailability(data);
+        this._renderTranslation(data);
         this._updateActionsRowVisibility();
       },
 
@@ -3548,9 +4945,10 @@
         if (!this.currentSummary || !this.currentSummary.summary) return;
         if (this._isGeneratingMindmap) return;
 
-        const apiKey = KeyPoolManager.getActiveKeyValue('gemini');
-        if (!apiKey) {
-          alert('請先到「⚙️ 設定」分頁填入 Gemini API Key，才能使用心智圖功能。');
+        const useOllamaMm = AIProviderConfig.getSummaryProvider() === 'ollama';
+        const apiKey = useOllamaMm ? '' : KeyPoolManager.getActiveKeyValue('gemini');
+        if (!useOllamaMm && !apiKey) {
+          alert('目前摘要服務是「Gemini 雲端」，請先到「⚙️ 設定」分頁填入 Gemini API Key（或切成「本機 Ollama」即可免 Key）。');
           return;
         }
 
@@ -3561,7 +4959,9 @@
         if (hint) { hint.textContent = '正在根據摘要內容整理心智圖，請稍候...'; }
 
         try {
-          const outline = await this._callGeminiMindmap(this.currentSummary.summary, apiKey);
+          const outline = useOllamaMm
+            ? await OllamaClient.mindmap(this.currentSummary.summary)
+            : await this._callGeminiMindmap(this.currentSummary.summary, apiKey);
           this.currentSummary.mindmapOutline = outline;
           this._persist(this.currentSummary);
           this._renderMindmap(this.currentSummary);
@@ -3728,10 +5128,16 @@
         this.switchMindmapView('view');
       },
 
+      // 防呆：操作列永遠顯示，沒有摘要時按鈕全部停用＋改提示文字，
+      // 避免使用者點了沒反應、以為壞掉
       _updateActionsRowVisibility() {
         const row = document.getElementById('summaryActionsRow');
         if (!row) return;
-        row.classList.toggle('hidden', !this.currentSummary);
+        const has = !!this.currentSummary;
+        row.classList.remove('hidden');
+        const hint = document.getElementById('summaryActionsHint');
+        if (hint) hint.textContent = has ? '💾 已保存在本機' : '尚未生成摘要，先勾選資料並生成';
+        row.querySelectorAll('button').forEach(b => { b.disabled = !has; });
       },
 
       copy() {
@@ -3743,6 +5149,145 @@
             alert('複製失敗，請手動選取摘要內容複製。');
           }
         });
+      },
+
+      // 摘要存檔：檔名帶時間戳，內含摘要＋待辦；若有譯文一併附在後面。
+      // 實際下載走 Utils 共用方法（文件譯文也用同一套）。
+      _downloadTextFile(filename, content) {
+        return Utils.downloadTextFile(filename, content);
+      },
+
+      _downloadStamp() {
+        return CopyToSheetFormat.formatTimestamp(new Date()).replace(' ', '_').replace(/:/g, '-');
+      },
+
+      download() {
+        if (!this.currentSummary) return;
+        const stamp = this._downloadStamp();
+        let content = `# 會議摘要（${stamp}）\n\n` + this.getPlainText();
+        const tr = this.currentSummary.translation;
+        if (tr && tr.text) {
+          content += `\n\n---\n# 譯文（${this.TRANSLATE_LANGS[tr.lang] || tr.lang}）\n\n` + tr.text;
+        }
+        this._downloadTextFile(`會議摘要_${stamp}.txt`, content);
+      },
+
+      downloadTranslation() {
+        const tr = this.currentSummary && this.currentSummary.translation;
+        if (!tr || !tr.text) return;
+        const stamp = this._downloadStamp();
+        const content = `# 會議摘要譯文（${this.TRANSLATE_LANGS[tr.lang] || tr.lang}，${stamp}）\n\n` + tr.text;
+        this._downloadTextFile(`會議摘要譯文_${stamp}.txt`, content);
+      },
+
+      copyTranslation() {
+        const tr = this.currentSummary && this.currentSummary.translation;
+        if (!tr || !tr.text) return;
+        copyTextRobust(tr.text).then(success => {
+          alert(success ? '已複製譯文到剪貼簿。' : '複製失敗，請手動選取譯文內容複製。');
+        });
+      },
+
+      // 共用翻譯核心：摘要翻譯與文件翻譯共用，走目前的摘要服務
+      // （Gemini／Ollama）。Key 缺失時拋錯，由呼叫端決定怎麼提示。
+      async translateText(sourceText, langLabel) {
+        const useOllama = AIProviderConfig.getSummaryProvider() === 'ollama';
+        if (useOllama) {
+          return OllamaClient.translate(sourceText, {}, langLabel);
+        }
+        const apiKey = KeyPoolManager.getActiveKeyValue('gemini');
+        if (!apiKey) {
+          throw new Error('目前摘要服務是「Gemini 雲端」，請先到「⚙️ 設定」分頁填入 Gemini API Key（或切成免 Key 的「本機 Ollama」）。');
+        }
+        return this._callGeminiTranslate(sourceText, apiKey, langLabel);
+      },
+
+      // 摘要翻譯：目標語言一次一個，走目前的摘要服務（Gemini／Ollama）。
+      // 譯文存回 currentSummary.translation 並持久化，重整頁面還在；
+      // 重新生成摘要時舊譯文會被清空（見 _renderSummary）。
+      async translate() {
+        if (!this.currentSummary || !this.currentSummary.summary) return;
+        if (this._isTranslating) return;
+
+        const langSel = document.getElementById('translateLangSelect');
+        const targetLang = langSel ? langSel.value : 'zh';
+        const langLabel = this.TRANSLATE_LANGS[targetLang] || targetLang;
+
+        const useOllama = AIProviderConfig.getSummaryProvider() === 'ollama';
+        let apiKey = '';
+        if (!useOllama) {
+          apiKey = KeyPoolManager.getActiveKeyValue('gemini');
+          if (!apiKey) {
+            alert('目前摘要服務是「Gemini 雲端」，請先到「⚙️ 設定」分頁填入 Gemini API Key（或切成免 Key 的「本機 Ollama」）。');
+            return;
+          }
+        }
+
+        const btn = document.getElementById('translateBtn');
+        const box = document.getElementById('translateOutputBox');
+        this._isTranslating = true;
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ 翻譯中...'; }
+        if (box) {
+          box.classList.remove('hidden');
+          box.classList.remove('empty');
+          box.classList.add('loading');
+          box.textContent = `正在翻譯成${langLabel}，請稍候...`;
+        }
+
+        try {
+          const sourceText = this.getPlainText();
+          const text = useOllama
+            ? await OllamaClient.translate(sourceText, {}, langLabel)
+            : await this._callGeminiTranslate(sourceText, apiKey, langLabel);
+          this.currentSummary.translation = { lang: targetLang, text };
+          this._persist(this.currentSummary);
+          this._renderTranslation(this.currentSummary);
+        } catch (err) {
+          console.error('翻譯失敗：', err);
+          if (box) {
+            box.classList.remove('loading');
+            box.classList.add('empty');
+            box.textContent = '翻譯失敗：' + (err.message || err);
+          }
+        } finally {
+          this._isTranslating = false;
+          if (btn) { btn.disabled = false; btn.textContent = '翻譯'; }
+        }
+      },
+
+      // 譯文區塊渲染：翻譯列永遠顯示；沒摘要時下拉＋按鈕停用並顯示提示
+      // （防呆）。有摘要才啟用；有譯文才顯示譯文＋譯文按鈕。
+      // 下拉選單同步成已存譯文的語言，避免顯示跟內容對不上。
+      _renderTranslation(data) {
+        const row = document.getElementById('translateRow');
+        const box = document.getElementById('translateOutputBox');
+        const actions = document.getElementById('translateActionsRow');
+        const btn = document.getElementById('translateBtn');
+        const langSel = document.getElementById('translateLangSelect');
+        const hint = document.getElementById('translateHint');
+        if (!row || !box || !actions) return;
+
+        const hasSummary = !!(data && data.summary);
+        row.classList.remove('hidden');
+        if (btn) btn.disabled = !hasSummary || this._isTranslating;
+        if (langSel) langSel.disabled = !hasSummary;
+        if (hint) hint.style.display = hasSummary ? 'none' : 'inline';
+        if (!hasSummary) {
+          box.classList.add('hidden');
+          actions.classList.add('hidden');
+          return;
+        }
+        const tr = data.translation;
+        if (tr && tr.text) {
+          const langSel = document.getElementById('translateLangSelect');
+          if (langSel && this.TRANSLATE_LANGS[tr.lang]) langSel.value = tr.lang;
+          box.classList.remove('hidden', 'loading', 'empty');
+          box.textContent = tr.text;
+          actions.classList.remove('hidden');
+        } else {
+          box.classList.add('hidden');
+          actions.classList.add('hidden');
+        }
       },
 
       // 標記 type 為 'summary'，讓其他人讀取共用表格時能分辨這筆是
@@ -3796,11 +5341,315 @@
         this.closeShareMenu();
         if (!this.currentSummary) return;
         const text = this.getPlainText();
-        if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
+        if (typeof _isLiffInClient === 'function' && _isLiffInClient()) {
           ChatPreview.show(text, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(text));
           return;
         }
+        // _isLiffInClient 宣告在檔案後段（函式提升前暫時不可用），退回直接分享
+        try {
+          if (typeof liff !== 'undefined' && liff && typeof liff.isInClient === 'function' && liff.isInClient()) {
+            ChatPreview.show(text, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(text));
+            return;
+          }
+        } catch (e) {}
         ChatPreview.show(text, '手機系統分享', () => doWebShare(text));
+      }
+    };
+
+    // ---------- 文件上傳翻譯（PDF／DOCX → 中英日韓德）----------
+    // 解析全在本機做（pdf.js 讀 PDF 文字層、mammoth 讀 DOCX），檔案
+    // 不上傳到任何地方；翻譯走摘要服務的共用核心（translateText）。
+    // 舊版 .doc 是二進位 OLE 格式，瀏覽器解不了，直接擋下請使用者
+    // 轉存 docx。長文按段落切成 ~3000 字逐段序列翻譯：保序、避免打爆
+    // 雲端額度，也避開地端小模型的 context 上限，並顯示進度。
+    const FILE_TRANS_STORAGE_KEY = 'file_trans_draft';
+
+    const FileTransModule = {
+      CHUNK_SIZE: 3000,
+      MAX_CHARS: 100000,
+      PDF_WORKER_URL: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
+      sourceText: '',
+      fileName: '',
+      lastMeta: '',
+      translated: null, // { lang, text }
+      isWorking: false,
+      _pdfWorkerSet: false,
+
+      onFileSelected(fileList) {
+        if (!fileList || fileList.length === 0) return;
+        if (this.isWorking) {
+          alert('文件處理中，請稍候完成後再上傳下一個。');
+          this._resetInput();
+          return;
+        }
+        const file = fileList[0];
+        const name = file.name || '未命名檔案';
+        const ext = name.split('.').pop().toLowerCase();
+        if (ext === 'doc') {
+          alert('不支援舊版 .doc（Word 97-2003 二進位格式），瀏覽器無法解析。\n\n請用 Word「另存新檔 → .docx」後再上傳。');
+          this._resetInput();
+          return;
+        }
+        if (ext !== 'pdf' && ext !== 'docx') {
+          alert('只支援 PDF 與 DOCX 檔案。');
+          this._resetInput();
+          return;
+        }
+        document.getElementById('docFileName').textContent = `已選擇：${name}`;
+        this.parse(file, ext);
+      },
+
+      async parse(file, ext) {
+        this.isWorking = true;
+        this._setProgress(true, '解析文件中...');
+        this._lockChoose(true);
+        try {
+          const buf = await file.arrayBuffer();
+          let text = '';
+          let meta = '';
+          if (ext === 'pdf') {
+            const r = await this._parsePdf(buf);
+            text = r.text;
+            meta = r.meta;
+          } else {
+            text = await this._parseDocx(buf);
+            meta = `約 ${text.length.toLocaleString()} 字`;
+          }
+          text = (text || '').replace(/\r/g, '').trim();
+          if (text.length < 20) {
+            throw new Error(ext === 'pdf'
+              ? '讀不到文字（這份 PDF 可能是掃描圖片版，沒有文字層，無法翻譯）。'
+              : '讀不到文字內容（檔案可能是空的或只有圖片）。');
+          }
+          if (text.length > this.MAX_CHARS) {
+            const proceed = confirm(
+              `這份文件約 ${text.length.toLocaleString()} 字，超過建議的 ${this.MAX_CHARS.toLocaleString()} 字，翻譯會分很多段、耗時較久。\n\n仍要繼續嗎？`
+            );
+            if (!proceed) {
+              this._resetInput();
+              return;
+            }
+          }
+          this.sourceText = text;
+          this.fileName = file.name || '未命名檔案';
+          this.translated = null;
+          this._persist();
+          this._renderSource(meta);
+          this._renderOutput();
+        } catch (err) {
+          console.error('文件解析失敗：', err);
+          alert('解析失敗：' + (err.message || err));
+        } finally {
+          this.isWorking = false;
+          this._setProgress(false);
+          this._lockChoose(false);
+          this._resetInput();
+        }
+      },
+
+      async _parsePdf(buf) {
+        if (typeof pdfjsLib === 'undefined') {
+          throw new Error('PDF 解析套件尚未載入完成，請確認網路連線後重新整理頁面。');
+        }
+        if (!this._pdfWorkerSet) {
+          try { pdfjsLib.GlobalWorkerOptions.workerSrc = this.PDF_WORKER_URL; } catch (e) {}
+          this._pdfWorkerSet = true;
+        }
+        const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+        const pages = pdf.numPages;
+        const maxPages = Math.min(pages, 200);
+        const parts = [];
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await pdf.getPage(i);
+          const tc = await page.getTextContent();
+          parts.push(tc.items.map(it => it.str).join(' '));
+          if (i % 10 === 0) this._setProgress(true, `解析中...（${i}/${pages} 頁）`);
+        }
+        try { await pdf.destroy(); } catch (e) {}
+        const text = parts.join('\n\n');
+        const meta = `${pages} 頁、約 ${text.length.toLocaleString()} 字` + (pages > maxPages ? `（僅取前 ${maxPages} 頁）` : '');
+        return { text, meta };
+      },
+
+      async _parseDocx(buf) {
+        if (typeof mammoth === 'undefined') {
+          throw new Error('Word 解析套件尚未載入完成，請確認網路連線後重新整理頁面。');
+        }
+        const result = await mammoth.extractRawText({ arrayBuffer: buf });
+        return result.value || '';
+      },
+
+      _splitChunks(text) {
+        // 按段落貪心切段，每段不超過 CHUNK_SIZE。重點是別超過地端
+        // 小模型的 context 上限；句子被切半翻譯模型也能處理
+        const paras = text.split('\n');
+        const chunks = [];
+        let cur = '';
+        for (const p of paras) {
+          if (cur && (cur + '\n' + p).length > this.CHUNK_SIZE) {
+            chunks.push(cur);
+            cur = p;
+          } else {
+            cur = cur ? cur + '\n' + p : p;
+          }
+        }
+        if (cur) chunks.push(cur);
+        return chunks.filter(c => c.trim());
+      },
+
+      async translate() {
+        if (this.isWorking) return;
+        if (!this.sourceText) {
+          alert('請先上傳 PDF 或 DOCX 文件。');
+          return;
+        }
+        const langSel = document.getElementById('fileTranslateLangSelect');
+        const targetLang = langSel ? langSel.value : 'zh';
+        const langLabel = SummaryModule.TRANSLATE_LANGS[targetLang] || targetLang;
+        const chunks = this._splitChunks(this.sourceText);
+
+        this.isWorking = true;
+        const btn = document.getElementById('fileTranslateBtn');
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ 翻譯中...'; }
+        const box = document.getElementById('fileOutputBox');
+        try {
+          const out = [];
+          for (let i = 0; i < chunks.length; i++) {
+            if (box) {
+              box.classList.remove('empty');
+              box.textContent = `翻譯中...（第 ${i + 1}/${chunks.length} 段）`;
+            }
+            out.push(await SummaryModule.translateText(chunks[i], langLabel));
+          }
+          this.translated = { lang: targetLang, text: out.join('\n\n') };
+          this._persist();
+          this._renderOutput();
+        } catch (err) {
+          console.error('文件翻譯失敗：', err);
+          if (box) {
+            box.classList.remove('empty');
+            box.textContent = '翻譯失敗：' + (err.message || err);
+          }
+        } finally {
+          this.isWorking = false;
+          if (btn) { btn.disabled = false; btn.textContent = '🌐 翻譯文件'; }
+        }
+      },
+
+      _renderSource(meta) {
+        if (meta !== undefined) this.lastMeta = meta;
+        const hint = document.getElementById('fileSourceHint');
+        if (!hint) return;
+        if (!this.sourceText && !this.translated) {
+          hint.textContent = '尚未上傳文件。上傳後會顯示字數／頁數，選好目標語言後按下方按鈕開始翻譯。';
+          return;
+        }
+        if (this.translated && !this.sourceText) {
+          hint.innerHTML = `已還原上次 <b>${Utils.escapeHtml(this.fileName)}</b> 的譯文（原文過長未保留）。可直接複製／下載；要重翻請重新上傳。`;
+          return;
+        }
+        hint.innerHTML = `已讀取 <b>${Utils.escapeHtml(this.fileName)}</b>：${Utils.escapeHtml(this.lastMeta || '')}。選好目標語言後按「翻譯文件」。`;
+      },
+
+      _renderOutput() {
+        const box = document.getElementById('fileOutputBox');
+        const actions = document.getElementById('fileActionsRow');
+        if (!box || !actions) return;
+        if (this.translated && this.translated.text) {
+          box.classList.remove('empty');
+          box.textContent = this.translated.text;
+          actions.classList.remove('hidden');
+        } else {
+          box.classList.add('empty');
+          box.textContent = '譯文會顯示在這裡。長文件會自動分段、逐段翻譯。';
+          actions.classList.add('hidden');
+        }
+      },
+
+      // 切到文件分頁時刷新（剔除其他分頁操作後的過期狀態）
+      refresh() {
+        this._renderSource();
+        this._renderOutput();
+        if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
+      },
+
+      copy() {
+        if (!this.translated || !this.translated.text) return;
+        copyTextRobust(this.translated.text).then(success => {
+          alert(success ? '已複製譯文到剪貼簿。' : '複製失敗，請手動選取譯文內容複製。');
+        });
+      },
+
+      download() {
+        if (!this.translated || !this.translated.text) return;
+        const stamp = CopyToSheetFormat.formatTimestamp(new Date()).replace(' ', '_').replace(/:/g, '-');
+        const langLabel = SummaryModule.TRANSLATE_LANGS[this.translated.lang] || this.translated.lang;
+        const base = (this.fileName || '文件').replace(/\.[^.]+$/, '');
+        const content = `# ${base} 譯文（${langLabel}，${stamp}）\n\n` + this.translated.text;
+        Utils.downloadTextFile(`${base}_譯文_${stamp}.txt`, content);
+      },
+
+      remove() {
+        if (!this.translated && !this.sourceText) return;
+        if (!confirm('確定要清除已上傳的文件與譯文嗎？')) return;
+        this.sourceText = '';
+        this.fileName = '';
+        this.lastMeta = '';
+        this.translated = null;
+        try { localStorage.removeItem(FILE_TRANS_STORAGE_KEY); } catch (e) {}
+        const nameEl = document.getElementById('docFileName');
+        if (nameEl) nameEl.textContent = '';
+        this._renderSource();
+        this._renderOutput();
+      },
+
+      _persist() {
+        try {
+          // 來源太長就不存來源（譯文照存），避免塞爆 localStorage
+          const doc = {
+            fileName: this.fileName,
+            sourceText: this.sourceText.length > 50000 ? '' : this.sourceText,
+            translated: this.translated
+          };
+          localStorage.setItem(FILE_TRANS_STORAGE_KEY, JSON.stringify(doc));
+        } catch (e) {
+          console.warn('文件翻譯自動儲存失敗：', e);
+        }
+      },
+
+      restore() {
+        try {
+          const raw = localStorage.getItem(FILE_TRANS_STORAGE_KEY);
+          if (raw) {
+            const doc = JSON.parse(raw);
+            this.fileName = doc.fileName || '';
+            this.sourceText = doc.sourceText || '';
+            this.translated = (doc.translated && doc.translated.text) ? doc.translated : null;
+          }
+        } catch (e) {}
+        const nameEl = document.getElementById('docFileName');
+        if (nameEl && this.fileName) nameEl.textContent = `已還原：${this.fileName}`;
+        this._renderSource(this.sourceText ? `約 ${this.sourceText.length.toLocaleString()} 字（已還原）` : '');
+        this._renderOutput();
+      },
+
+      _setProgress(show, text) {
+        const row = document.getElementById('docProgressRow');
+        const label = document.getElementById('docProgressText');
+        if (row) row.classList.toggle('show', !!show);
+        if (label && text) label.textContent = text;
+      },
+
+      _lockChoose(locked) {
+        const el = document.getElementById('docFileChooseLabel');
+        if (!el) return;
+        el.style.opacity = locked ? '0.5' : '';
+        el.style.pointerEvents = locked ? 'none' : '';
+      },
+
+      _resetInput() {
+        const input = document.getElementById('docFileInput');
+        if (input) input.value = '';
       }
     };
 
@@ -3813,12 +5662,16 @@
         if (!fileList || fileList.length === 0) return;
         const file = fileList[0];
 
-        const apiKey = KeyPoolManager.getActiveKeyValue('groq');
-        if (!apiKey) {
-          alert('請先在上方輸入你的 Groq API Key，才能上傳語音檔案轉寫。');
-          this._resetInput();
-          return;
+        const sttProvider = AIProviderConfig.getSttProvider();
+        if (sttProvider === 'groq') {
+          const apiKey = KeyPoolManager.getActiveKeyValue('groq');
+          if (!apiKey) {
+            alert('目前辨識服務是「Groq 雲端」，請先到「⚙️ 設定」分頁填入 Groq API Key（或把辨識服務切成免 Key 的「本機 Ollama」／「Faster-Whisper」）。');
+            this._resetInput();
+            return;
+          }
         }
+        // ollama／fw 免 Key，直接走後續上傳流程
 
         if (this.isUploading) {
           alert('目前已有一個檔案正在上傳轉寫中，請稍候完成後再上傳下一個。');
@@ -3833,7 +5686,7 @@
         if (sizeMB > this.SUGGESTED_MAX_MB) {
           const proceed = confirm(
             `這個檔案約 ${sizeMB.toFixed(1)} MB，超過建議的 ${this.SUGGESTED_MAX_MB}MB，` +
-            `Groq Whisper API 對單檔大小有上限，太大的檔案可能會上傳失敗。\n\n` +
+            `所選轉寫服務對單檔大小多半有上限，太大的檔案可能會上傳失敗。\n\n` +
             `仍要嘗試上傳嗎？（若失敗，可考慮先用其他工具壓縮或剪短音檔後再試）`
           );
           if (!proceed) {
@@ -3876,6 +5729,27 @@
       },
 
       async _transcribeFile(file) {
+        // 地端免 Key：Faster-Whisper／Ollama 直連使用者指定的位址
+        if (AIProviderConfig.getSttProvider() === 'fw') {
+          const langParams = LanguageManager.getParamsForSegment();
+          const text = await FasterWhisperClient.transcribe(file, {
+            fileName: file.name || 'upload.audio',
+            prompt: (langParams && langParams.prompt) || 'This is a recording of a meeting.',
+            languageCode: langParams ? langParams.languageCode : undefined
+          });
+          return text || '';
+        }
+        if (AIProviderConfig.getSttProvider() === 'ollama') {
+          const langParams = LanguageManager.getParamsForSegment();
+          const text = await OllamaClient.transcribe(file, {
+            fileName: file.name || 'upload.audio',
+            prompt: (langParams && langParams.prompt) || 'This is a recording of a meeting. Transcribe the audio exactly as spoken.',
+            languageCode: langParams ? langParams.languageCode : undefined
+          });
+          try { LanguageManager.onDetectedLanguageOllama(''); } catch (e) {}
+          return text || '';
+        }
+
         const apiKey = KeyPoolManager.getActiveKeyValue('groq');
         const formData = new FormData();
         formData.append('file', file, file.name || 'upload.audio');
@@ -3938,7 +5812,8 @@
         zh: { languageCode: 'zh', prompt: '這是一段會議錄音，內容關於工作討論與進度回報。' },
         en: { languageCode: 'en', prompt: 'This is a recording of a business meeting discussing work updates and progress.' },
         ja: { languageCode: 'ja', prompt: 'これは仕事の進捗報告や打ち合わせに関する会議の録音です。' },
-        ko: { languageCode: 'ko', prompt: '이것은 업무 논의와 진행 상황 보고에 관한 회의 녹음입니다.' }
+        ko: { languageCode: 'ko', prompt: '이것은 업무 논의와 진행 상황 보고에 관한 회의 녹음입니다.' },
+        de: { languageCode: 'de', prompt: 'Dies ist die Aufnahme einer Besprechung zu Arbeitsdiskussionen und Fortschrittsberichten.' }
       },
 
       AUTO_LOCK_MS: 60000,
@@ -3973,8 +5848,8 @@
       onDetectedLanguage(detectedLangRaw) {
         if (this.selectedMode !== 'auto' || !detectedLangRaw) return;
 
-        // 'korean' 是 Groq Whisper API 回傳語言名稱的格式（英文全名小寫）
-        const map = { chinese: 'zh', english: 'en', japanese: 'ja', korean: 'ko' };
+        // 'german' 是 Groq Whisper API 回傳語言名稱的格式（英文全名小寫）
+        const map = { chinese: 'zh', english: 'en', japanese: 'ja', korean: 'ko', german: 'de' };
         const langCode = map[detectedLangRaw.toLowerCase()];
         if (!langCode) return;
 
@@ -3983,8 +5858,23 @@
         this.showDetectHint(langCode);
       },
 
+      // Ollama 本機轉寫回傳的可能是 ISO 代碼（zh/en/ja/ko/de）而非英文全名，
+      // 與 Groq 共用同一套鎖定邏輯，只是多一層代碼對應
+      onDetectedLanguageOllama(detectedLangRaw) {
+        if (this.selectedMode !== 'auto' || !detectedLangRaw) return;
+        const raw = String(detectedLangRaw).toLowerCase().trim();
+        const direct = { zh: 'zh', en: 'en', ja: 'ja', ko: 'ko', de: 'de' };
+        if (direct[raw]) {
+          this.autoDetectedLang = direct[raw];
+          this.autoLockExpiresAt = Date.now() + this.AUTO_LOCK_MS;
+          this.showDetectHint(direct[raw]);
+          return;
+        }
+        this.onDetectedLanguage(detectedLangRaw);
+      },
+
       showDetectHint(langCode) {
-        const labels = { zh: '中文', en: '英文', ja: '日文', ko: '韓文' };
+        const labels = { zh: '中文', en: '英文', ja: '日文', ko: '韓文', de: '德文' };
         const hint = document.getElementById('langDetectHint');
         if (!hint) return;
         hint.textContent = `🌐 偵測到：${labels[langCode] || langCode}`;
@@ -4033,10 +5923,24 @@
       },
 
       async start() {
-        const apiKey = KeyPoolManager.getActiveKeyValue('groq');
-        if (!apiKey) {
-          alert('請先在上方輸入你的 API Key！');
-          return;
+        const sttProvider = AIProviderConfig.getSttProvider();
+        if (sttProvider === 'ollama') {
+          const model = AIProviderConfig.getSttModel();
+          if (!model) {
+            alert('請先到「⚙️ 設定」填好 Ollama（辨識用）轉寫模型。');
+            return;
+          }
+        } else if (sttProvider === 'fw') {
+          if (!AIProviderConfig.getFwModel()) {
+            alert('請先到「⚙️ 設定」填好 Faster-Whisper 轉寫模型。');
+            return;
+          }
+        } else {
+          const apiKey = KeyPoolManager.getActiveKeyValue('groq');
+          if (!apiKey) {
+            alert('目前辨識服務是「Groq 雲端」，請先到「⚙️ 設定」分頁填入 Groq API Key（或切成免 Key 的「本機 Ollama」／「Faster-Whisper」）。');
+            return;
+          }
         }
 
         LanguageManager.resetAutoState();
@@ -4124,6 +6028,70 @@
         this._pendingCount = (this._pendingCount || 0) + 1;
         if (this.isRecording) {
           statusText.textContent = `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`;
+        }
+
+        // 地端 Faster-Whisper 分流：免 Key，直連自家服務
+        if (AIProviderConfig.getSttProvider() === 'fw') {
+          try {
+            const langParams = LanguageManager.getParamsForSegment();
+            const text = await FasterWhisperClient.transcribe(audioBlob, {
+              fileName: 'recording.webm',
+              prompt: (langParams && langParams.prompt) || 'This is a recording of a meeting.',
+              languageCode: langParams ? langParams.languageCode : undefined
+            });
+            this._pendingCount = Math.max(0, this._pendingCount - 1);
+            if (text && text.trim()) CardSandbox.add(text.trim());
+            if (this.isRecording) {
+              statusText.textContent = this._pendingCount > 0
+                ? `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`
+                : '錄音中，卡片會陸續出現。';
+            } else if (this._pendingCount === 0) {
+              statusText.textContent = '全部轉寫完成。';
+            }
+          } catch (err) {
+            this._pendingCount = Math.max(0, this._pendingCount - 1);
+            console.error('Faster-Whisper 轉寫失敗:', err);
+            if (this.isRecording) {
+              statusText.textContent = '⚠️ 有一段轉寫失敗，繼續錄音中（此段內容可能遺漏）：' + (err.message || err);
+            } else {
+              statusText.textContent = '⚠️ 有一段轉寫失敗：' + (err.message || err);
+            }
+            alert('Faster-Whisper 轉寫失敗：' + (err.message || err));
+          }
+          return;
+        }
+
+        // 本機 Ollama 分流：免 Key，15 秒一切段對語音模型剛好（多模態音訊多半上限約 30 秒）
+        if (AIProviderConfig.getSttProvider() === 'ollama') {
+          try {
+            const langParams = LanguageManager.getParamsForSegment();
+            const text = await OllamaClient.transcribe(audioBlob, {
+              fileName: 'recording.webm',
+              prompt: (langParams && langParams.prompt)
+                ? `${langParams.prompt} Transcribe the audio exactly as spoken. Output only the spoken words.`
+                : 'Transcribe the audio exactly as spoken. Output only the spoken words.',
+              languageCode: langParams ? langParams.languageCode : undefined
+            });
+            this._pendingCount = Math.max(0, this._pendingCount - 1);
+            if (text && text.trim()) CardSandbox.add(text.trim());
+            if (this.isRecording) {
+              statusText.textContent = this._pendingCount > 0
+                ? `⏳ 背景轉寫中（${this._pendingCount} 段處理中）...`
+                : '錄音中，卡片會陸續出現。';
+            } else if (this._pendingCount === 0) {
+              statusText.textContent = '全部轉寫完成。';
+            }
+          } catch (err) {
+            this._pendingCount = Math.max(0, this._pendingCount - 1);
+            console.error('Ollama 轉寫失敗:', err);
+            if (this.isRecording) {
+              statusText.textContent = '⚠️ 有一段轉寫失敗，繼續錄音中（此段內容可能遺漏）：' + (err.message || err);
+            } else {
+              statusText.textContent = '⚠️ 有一段轉寫失敗：' + (err.message || err);
+            }
+            alert('Ollama 轉寫失敗：' + (err.message || err));
+          }
+          return;
         }
 
         const formData = new FormData();
@@ -4241,74 +6209,54 @@
     };
 
     // ---------- 存取閘門（Access Gate）----------
+    // 已移除 LINE 登入與加好友檢查：不需要登入、不需要加官方帳號，
+    // 任何瀏覽器開啟即可使用。LIFF 只作為「可選增強」（在 LINE 內開啟時
+    // 才有送回聊天室／好友分享），初始化失敗或不在 LINE 內都不阻擋進入。
+    // 唯一保留的閘門是使用須知同意書（本機 localStorage 記錄版本）。
     const LIFF_ID = '2011466063-7UKiaeuw';
     let liffReady = false;
 
-    const CONSENT_VERSION = '2026-08-v2';
+    const CONSENT_VERSION = '2026-09-rwd-fw-v1';
 
     const AccessGate = {
       _friendCheckInProgress: false,
 
       showPanel(panelId) {
-        ['gateLoading', 'gateNotFriend', 'gateConsent'].forEach(id => {
-          document.getElementById(id).style.display = (id === panelId) ? 'block' : 'none';
+        ['gateLoading', 'gateConsent'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.style.display = (id === panelId) ? 'block' : 'none';
         });
       },
 
       async run() {
         this.showPanel('gateLoading');
+        // LIFF 可選：有載入 SDK 才嘗試初始化，失敗直接放行，不擋路
         try {
-          await liff.init({ liffId: LIFF_ID });
-          liffReady = true;
+          if (typeof liff !== 'undefined' && liff && typeof liff.init === 'function') {
+            await liff.init({ liffId: LIFF_ID });
+            liffReady = true;
+          } else {
+            console.log('未載入 LIFF SDK，以一般瀏覽器模式繼續（免登入）。');
+          }
         } catch (err) {
-          console.error('LIFF 初始化失敗：', err);
-          document.getElementById('gateLoading').innerHTML =
-            '<div class="gate-title">無法載入</div><div class="gate-desc">初始化失敗，請確認網路連線後重新整理頁面。若持續發生，請透過官方帳號回報。</div>';
-          return;
+          console.warn('LIFF 初始化失敗，改以一般瀏覽器模式繼續：', err);
+          liffReady = false;
         }
 
-        if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
-          return;
-        }
-
+        // 不檢查登入、不檢查好友，直接進使用須知
         await this.checkFriendshipAndProceed();
       },
 
       async checkFriendshipAndProceed() {
-        //if (this._friendCheckInProgress) return;
-        this._friendCheckInProgress = true;
-        this.showPanel('gateLoading');
-		/*
-        try {
-          const { friendFlag } = await liff.getFriendship();
-          if (!friendFlag) {
-            this.showPanel('gateNotFriend');
-            return;
-          }
-		*/
-          this.checkConsentAndProceed();
-		/*
-        } catch (err) {
-          console.error('好友狀態查詢失敗：', err);
-          document.getElementById('gateNotFriend').querySelector('.gate-desc').textContent =
-            '無法確認好友狀態，請確認已加好友並允許權限後，點下方按鈕重新檢查。';
-          this.showPanel('gateNotFriend');
-        } finally {
-          this._friendCheckInProgress = false;
-        }
-		*/
+        // 好友檢查已移除（免加官方帳號），保留方法名稱避免舊按鈕呼叫壞掉
+        this.checkConsentAndProceed();
       },
 
       goAddFriend() {
-        const addFriendUrl = 'https://line.me/R/ti/p/@165tgzzz';
-        if (typeof liff.openWindow === 'function') {
-          liff.openWindow({ url: addFriendUrl, external: true });
-        } else {
-          window.open(addFriendUrl, '_blank');
-        }
+        // 好友機制已移除，保留空方法避免舊 HTML/快取呼叫時拋錯
+        this.checkConsentAndProceed();
       },
-	  
+
 
       recheck() {
         this.checkFriendshipAndProceed();
@@ -4337,9 +6285,7 @@
       },
 
       declineAndLeave() {
-        if (liffReady && liff.isInClient() && typeof liff.closeWindow === 'function') {
-          liff.closeWindow();
-        }
+        // 已免登入：沒有視窗可關，直接顯示結束訊息即可
         try { window.close(); } catch (e) { /* 忽略 */ }
 
         document.getElementById('gateConsent').innerHTML =
@@ -4357,6 +6303,8 @@
         SummaryModule.restore();
         SummaryModule.renderPool();
 
+        FileTransModule.restore();
+
         SharedSheetNotes.resetUI();
 
         SettingsPanel.render();
@@ -4366,16 +6314,32 @@
         KeyPoolPanel.render('groq');
         KeyPoolPanel.render('gemini');
 
+        if (typeof AIProviderConfig !== 'undefined') {
+          AIProviderConfig.syncUI();
+          // 進站時順手讀一次本機模型清單（失敗也不擋路，下拉仍保留手打值）
+          try { AIProviderConfig.refreshModels('all'); } catch (e) {}
+          try { AIProviderConfig.refreshFwModels(); } catch (e) {}
+        }
+        if (typeof ServerKeySync !== 'undefined') {
+          try { ServerKeySync.check(); } catch (e) {}
+        }
+
         if (CardSandbox.cards.length > 0) {
           MainNav.switchTo('cards');
         }
       }
     };
 
-    // ---------- LIFF 發送邏輯 ----------
+    // ---------- 發送邏輯（LINE 為可選，一般瀏覽器走系統分享／複製）----------
     AccessGate.run();
 
-    // ---------- 送回聊天室（sendMessages）----------
+    // ---------- 送回聊天室（僅 LINE 內有效，免登入；一般瀏覽器改走系統分享）----------
+    function _isLiffInClient() {
+      try {
+        return liffReady && typeof liff !== 'undefined' && liff
+          && typeof liff.isInClient === 'function' && liff.isInClient();
+      } catch (e) { return false; }
+    }
     async function handleSendToRoom() {
       const fullText = CardSandbox.cards
         .map(c => c.text)
@@ -4385,8 +6349,9 @@
         return;
       }
 
-      if (!liffReady || typeof liff.isInClient !== 'function' || !liff.isInClient()) {
-        alert('這個功能只能在 LINE 聊天室裡開啟這個頁面時使用（目前不是這個環境），請改用下方另外兩種發送方式，或回到跟機器人的聊天室重新點開連結。');
+      if (!_isLiffInClient()) {
+        // 免登入：一般瀏覽器沒有「原聊天室」可送，直接改走系統分享／複製
+        ChatPreview.show(fullText, '手機系統分享（目前不在 LINE 聊天室內，無原對話可送）', () => doWebShare(fullText));
         return;
       }
 
@@ -4558,21 +6523,19 @@
     }
 
     async function doSend(fullText, resumeFromBatch) {
-      if (!liffReady) {
+      // 免登入：LIFF 不可用、不在 LINE 內、或沒有 shareTargetPicker，
+      // 一律退回系統分享／複製，不再導向登入頁
+      const canUsePicker = (() => {
+        try {
+          return liffReady && typeof liff !== 'undefined' && liff
+            && typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker');
+        } catch (e) { return false; }
+      })();
+
+      if (!canUsePicker) {
         copyToClipboardFallback(fullText);
         return;
       }
-
-      if (typeof liff.isLoggedIn === 'function' && !liff.isLoggedIn()) {
-        try {
-          sessionStorage.setItem('pending_send_text', fullText);
-        } catch (e) { /* sessionStorage 不可用時，登入完成後需使用者重新按一次發送 */ }
-        alert('需要先登入 LINE 才能選擇發送對象，即將導向登入頁面。');
-        liff.login({ redirectUri: window.location.href });
-        return;
-      }
-
-      if (typeof liff.isApiAvailable === 'function' && liff.isApiAvailable('shareTargetPicker')) {
         // LINE 文字訊息單則上限 5000 字元，且 shareTargetPicker 跟
         // sendMessages 同樣單次呼叫最多 5 則，故沿用 splitTextForLine
         // 分段後再依 LINE_MAX_MESSAGES_PER_CALL 分批。
@@ -4649,10 +6612,6 @@
           alert('發送失敗，中斷進度已保留，可下次重新分享時選擇接續。改為複製到剪貼簿，請手動貼上：\n' + err.message);
           copyToClipboardFallback(fullText);
         }
-        return;
-      }
-
-      copyToClipboardFallback(fullText);
     }
 
     window.addEventListener('load', () => {
@@ -4725,7 +6684,7 @@
         return;
       }
 
-      if (liffReady && typeof liff.isInClient === 'function' && liff.isInClient()) {
+      if (_isLiffInClient()) {
         ChatPreview.show(fullText, 'LINE 好友選單（此環境不支援手機系統分享，改用此方式）', () => doSend(fullText));
         return;
       }
