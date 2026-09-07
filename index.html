@@ -896,7 +896,7 @@
           <div class="version-entry">
             <h4>新增📄文件分頁：上傳 PDF／DOCX 翻譯</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
-              <li>新增第 6 個分頁<b>「📄 文件」</b>：上傳 PDF（需有文字層）或 DOCX，選中英日韓德一種語言，一鍵翻譯，譯文可複製／下載／清除</li>
+              <li>新增第 6 個分頁<b>「📄 翻譯」</b>：上傳 PDF（需有文字層）或 DOCX，選中英日韓德一種語言，一鍵翻譯，譯文可複製／下載／清除</li>
               <li>檔案解析全在<b>本機瀏覽器</b>做（pdf.js／mammoth，不上傳）；翻譯共用摘要服務的設定（Gemini／Ollama），長文件自動按段落切段逐段翻並顯示進度</li>
               <li>辨識的「🎯 地端 Faster-Whisper」追加支援 <b>whisper.cpp（whisper-server）的 <code>/inference</code></b>：轉寫依序試 <code>/v1/audio/transcriptions</code> → <code>/asr</code> → <code>/inference</code>，打 whisper.cpp 會自動轉成 16k WAV 再送；「測試連線」也認得 whisper.cpp，不會再誤報失敗</li>
               <li>修正「從伺服器載入」遇到空 Key 池就整份報錯的問題：現在空池自動略過、本機保留原值，有用的服務設定照樣套用；兩邊都空才會報錯。存檔時若 Key 池全空也會先跳確認，避免存出空檔</li>
@@ -1232,7 +1232,7 @@
       <span class="toast-text" id="storageToastText"></span>
     </div>
 
-    <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／📄文件／⚙️設定，
+    <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／📄翻譯／⚙️設定，
          同一時間只顯示一個分頁內容 -->
     <div class="main-tabs">
       <button id="navTabRecord" class="active" onclick="MainNav.switchTo('record')">
@@ -1248,7 +1248,7 @@
         <span class="tab-icon">📝</span><span class="tab-label" data-i18n="nav.summary">摘要</span>
       </button>
       <button id="navTabFile" onclick="MainNav.switchTo('file')">
-        <span class="tab-icon">📄</span><span class="tab-label" data-i18n="nav.file">文件</span>
+        <span class="tab-icon">📄</span><span class="tab-label" data-i18n="nav.file">翻譯</span>
       </button>
       <button id="navTabSettings" onclick="MainNav.switchTo('settings')">
         <span class="tab-icon">⚙️</span><span class="tab-label" data-i18n="nav.settings">設定</span>
@@ -1850,7 +1850,7 @@
       'nav.cards': '筆記',
       'nav.shared': '共享',
       'nav.summary': '摘要',
-      'nav.file': '文件',
+      'nav.file': '翻譯',
       'nav.settings': '設定',
       'settings.uiLang': '🌐 介面語言'
     });
