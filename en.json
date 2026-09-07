@@ -515,5 +515,18 @@
   "inv.saved": "Saved to notes. See the \"🗂️ Notes\" tab.",
   "inv.items": "📋 Line items",
   "inv.itemsQr": "✅ Items from the invoice QR code",
-  "inv.itemsOcr": "🔍 Items guessed from OCR text — please verify"
+  "inv.itemsOcr": "🔍 Items guessed from OCR text — please verify",
+  "nav.live": "Live translation",
+  "live.keyMissing": "🔑 Not ready yet. Tap here to go to Settings",
+  "live.needStt": "🔑 Transcription service not ready (Groq needs a key). Tap here to go to Settings",
+  "live.needSum": "🔑 Summary service not ready (Gemini needs a key). Tap here to go to Settings",
+  "live.sttNote": "Recognition language follows the Record tab; translation uses the Summary tab's service.",
+  "live.clickToStart": "Press start — a translated segment appears every 15 seconds",
+  "live.emptyBox": "No translations yet",
+  "live.copy": "📋 Copy full translation",
+  "live.recording": "Translating live; translations will appear as you go.",
+  "live.allDone": "All translations done.",
+  "live.pane1": "Upper",
+  "live.pane2": "Lower",
+  "live.routeHint": "AI auto-detects the spoken language and shows the translation in the other pane; when unsure, both panes show it."
 }

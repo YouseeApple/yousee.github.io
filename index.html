@@ -275,6 +275,16 @@
     .live-preview-empty {
       font-size: 13px; color: rgba(255,255,255,0.5); padding: 10px; text-align: center;
     }
+    /* 即時翻譯雙層：每層列表壓矮，兩層並存不佔滿畫面。
+       標籤色分閒置（淺底）／錄音中（深底）兩態，避免看不見。 */
+    .live-pane-label {
+      font-size: 12px; font-weight: 700; color: var(--ink-soft);
+      margin: 12px 0 6px; display: flex; align-items: center; gap: 6px;
+    }
+    .live-pane-label .live-pane-lang { color: var(--line-green-dark); }
+    .meeting-mode.recording .live-pane-label { color: rgba(255,255,255,0.75); }
+    .meeting-mode.recording .live-pane-label .live-pane-lang { color: #8de055; }
+    #navPanelLive .live-preview-list { max-height: 150px; margin-bottom: 0; }
     .live-preview-item {
       font-size: 13px; color: #fff; line-height: 1.5; word-break: break-word;
       padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -432,7 +442,7 @@
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-    /* 主導覽 7 分頁列，sticky 固定頂部，切分頁不需重新捲動（＋白版外部連結鈕）。
+    /* 主導覽 8 分頁列，sticky 固定頂部，切分頁不需重新捲動（＋白版外部連結鈕）。
        橫向可滑動：按鈕保底寬度不被擠扁，分頁再多也只會往右滑、不會
        換行或消失；捲軸隱藏保持乾淨。 */
     .main-tabs {
@@ -916,6 +926,19 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>即時翻譯改雙層＋自動分流</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>即時翻譯改<b>上下兩層</b>，各選一種目標語言（預設上層中文、下層英文）；AI 自動判斷說話語言翻成另一層顯示，判斷不出來時兩層都顯示，每句附來源語言標籤</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>即時翻譯＋停止立即轉寫</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>導覽列新增<b>「🌐 即時翻譯」</b>：介面跟錄音一樣，按開始錄音後每 15 秒顯示一段譯文，目標語言可選中英日韓德；Groq 轉寫抽成三處共用，不寫筆記</li>
+              <li>「錄音」與「即時翻譯」按<b>停止錄音後立即轉寫剩下的內容</b>（先逼出緩衝音訊再停），不用等下一個 15 秒</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>白版＋發票OCR</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>導覽列新增<b>「🎨 白版」</b>：點一下直接開新分頁到小畫家白板，開會同時手寫，兩邊並行</li>
@@ -1308,13 +1331,16 @@
       <button id="navTabInvoice" onclick="MainNav.switchTo('invoice')">
         <span class="tab-icon">🧾</span><span class="tab-label" data-i18n="nav.invoice">發票</span>
       </button>
+      <button id="navTabLive" onclick="MainNav.switchTo('live')">
+        <span class="tab-icon">🌐</span><span class="tab-label" data-i18n="nav.live">即時翻譯</span>
+      </button>
       <button id="navTabSettings" onclick="MainNav.switchTo('settings')">
         <span class="tab-icon">⚙️</span><span class="tab-label" data-i18n="nav.settings">設定</span>
       </button>
     </div>
 
     <main>
-      <!-- ============ Tab 1／7：錄音 ============ -->
+      <!-- ============ Tab 1／8：錄音 ============ -->
       <div id="navPanelRecord" class="nav-panel">
         <!-- 只在 Key 未設定時顯示，點擊直接跳轉設定分頁 -->
         <div class="key-missing-hint hidden" id="recordKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="rec.keyMissing">
@@ -1381,7 +1407,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 2／7：筆記（語音卡片） ============ -->
+      <!-- ============ Tab 2／8：筆記（語音卡片） ============ -->
       <div id="navPanelCards" class="nav-panel hidden">
         <div class="copy-sheet-format-row">
           <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" data-i18n-title="notes.copySheetTitle" title="把目前所有卡片內容整理成一包資料，貼到 Google Sheet 空白儲存格即可" data-i18n="notes.copySheet">
@@ -1398,7 +1424,7 @@
         <div class="cards" id="cardsList"></div>
       </div>
 
-      <!-- ============ Tab 3／7：共享筆記 ============ -->
+      <!-- ============ Tab 3／8：共享筆記 ============ -->
       <div id="navPanelShared" class="nav-panel hidden">
         <!-- 唯讀查看共享 Google Sheet 筆記，可勾選並與語音卡片混合送去
              「摘要」分頁生成，順序依勾選先後決定。完全不寫入 Sheet -->
@@ -1434,7 +1460,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 4／7：AI 摘要 ============ -->
+      <!-- ============ Tab 4／8：AI 摘要 ============ -->
       <div id="navPanelSummary" class="nav-panel hidden">
         <!-- 摘要來源讀取 SelectionPool（卡片+共享筆記統一勾選池） -->
         <div class="key-missing-hint hidden" id="summaryKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="sum.keyMissing">
@@ -1541,7 +1567,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 5／7：文件翻譯 ============ -->
+      <!-- ============ Tab 5／8：文件翻譯 ============ -->
       <div id="navPanelFile" class="nav-panel hidden">
         <!-- 翻譯走摘要服務的共用設定，未就緒時顯示此提示 -->
         <div class="key-missing-hint hidden" id="fileKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="file.keyMissing">
@@ -1587,7 +1613,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 6／7：發票OCR ============ -->
+      <!-- ============ Tab 6／8：發票OCR ============ -->
       <div id="navPanelInvoice" class="nav-panel hidden">
         <div class="upload-panel">
           <div class="upload-panel-label" data-i18n="inv.upTitle">🧾 上傳發票</div>
@@ -1627,7 +1653,56 @@
         </div>
       </div>
 
-      <!-- ============ Tab 7／7：設定 ============ -->
+      <!-- ============ Tab 7／8：即時翻譯 ============ -->
+      <div id="navPanelLive" class="nav-panel hidden">
+        <!-- STT＋翻譯兩邊都要就緒才顯示按鈕，未就緒顯示此提示 -->
+        <div class="key-missing-hint hidden" id="liveKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="live.keyMissing">
+          🔑 尚未就緒，點此前往設定
+        </div>
+
+        <div class="lang-select-row">
+          <label for="liveTargetLang1Select" class="lang-select-label">🌐 <span data-i18n="live.pane1">上層</span></label>
+          <select id="liveTargetLang1Select">
+            <option value="zh">繁體中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </div>
+        <div class="lang-select-row">
+          <label for="liveTargetLang2Select" class="lang-select-label">🌐 <span data-i18n="live.pane2">下層</span></label>
+          <select id="liveTargetLang2Select">
+            <option value="zh">繁體中文</option>
+            <option value="en" selected>English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </div>
+        <div class="shared-notes-panel-desc" style="margin-bottom:12px;" data-i18n="live.routeHint">AI 會自動判斷說話語言，翻成另一層的語言顯示；判斷不出來時兩層都顯示。</div>
+        <div class="shared-notes-panel-desc" style="margin-bottom:12px;" data-i18n="live.sttNote">辨識語言共用「錄音」分頁的設定；翻譯走「摘要」分頁的服務設定。</div>
+
+        <div class="meeting-mode" id="liveMeetingCard">
+          <div class="rec-orb" id="liveRecOrb">🌐</div>
+          <div class="rec-status-text" id="liveStatusText" data-i18n="rec.notStarted">尚未開始</div>
+          <div class="rec-sub-text" id="liveSubText" data-i18n="live.clickToStart">按下開始錄音，每 15 秒顯示一段翻譯</div>
+          <div class="live-pane-label"><span data-i18n="live.pane1">上層</span> · <span id="livePane1Lang"></span></div>
+          <div class="live-preview-list" id="liveTransList1">
+            <div class="live-preview-empty" data-i18n="live.emptyBox">尚無譯文</div>
+          </div>
+          <div class="live-pane-label"><span data-i18n="live.pane2">下層</span> · <span id="livePane2Lang"></span></div>
+          <div class="live-preview-list" id="liveTransList2">
+            <div class="live-preview-empty" data-i18n="live.emptyBox">尚無譯文</div>
+          </div>
+          <button class="btn-record-toggle start" id="liveRecordToggleBtn" onclick="LiveTransEngine.toggle()" data-i18n="rec.start">開始錄音</button>
+        </div>
+        <div class="copy-sheet-format-row" style="margin-top:12px;">
+          <button class="btn-copy-sheet-format" onclick="LiveTransEngine.copy()" data-i18n="live.copy">📋 複製譯文全文</button>
+        </div>
+      </div>
+
+      <!-- ============ Tab 8／8：設定 ============ -->
       <div id="navPanelSettings" class="nav-panel hidden">
         <div class="provider-switch-row">
           <span class="provider-switch-label" data-i18n="settings.uiLang">🌐 介面語言</span>
@@ -2500,6 +2575,23 @@
       'inv.items': '📋 購買明細',
       'inv.itemsQr': '✅ 明細來自發票 QR Code，直接可信',
       'inv.itemsOcr': '🔍 明細由辨識文字推測，請核對'
+    });
+    Object.assign(STRINGS.zh, {
+      'nav.live': '即時翻譯',
+      'live.keyMissing': '🔑 尚未就緒，點此前往設定',
+      'live.needStt': '🔑 辨識服務尚未就緒（Groq 需 Key），點此前往設定',
+      'live.needSum': '🔑 摘要服務尚未就緒（Gemini 需 Key），點此前往設定',
+      'live.sttNote': '辨識語言共用「錄音」分頁的設定；翻譯走「摘要」分頁的服務設定。',
+      'live.clickToStart': '按下開始錄音，每 15 秒顯示一段翻譯',
+      'live.emptyBox': '尚無譯文',
+      'live.copy': '📋 複製譯文全文',
+      'live.recording': '錄音翻譯中，譯文會陸續出現。',
+      'live.allDone': '全部翻譯完成。'
+    });
+    Object.assign(STRINGS.zh, {
+      'live.pane1': '上層',
+      'live.pane2': '下層',
+      'live.routeHint': 'AI 會自動判斷說話語言，翻成另一層的語言顯示；判斷不出來時兩層都顯示。'
     });
     /*__I18N_DICT__*/
 
@@ -3564,7 +3656,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-invoice-items';
+    const APP_VERSION = '2026-09-live-dual';
 
     const IntroModal = {
       switchTab(tab) {
@@ -4237,7 +4329,7 @@
       switchTo(tab) {
         this.current = tab;
 
-        const tabs = ['record', 'cards', 'shared', 'summary', 'file', 'invoice', 'settings'];
+        const tabs = ['record', 'cards', 'shared', 'summary', 'file', 'invoice', 'live', 'settings'];
         tabs.forEach(t => {
           const btn = document.getElementById('navTab' + this._capitalize(t));
           const panel = document.getElementById('navPanel' + this._capitalize(t));
@@ -4259,14 +4351,16 @@
 
         document.getElementById('actionBar').style.display = (tab === 'cards') ? 'block' : 'none';
 
-        // 每次切到「筆記」或「摘要」分頁時，順手刷新一次相關畫面，
-        // 確保跨分頁的狀態（例如在「共享」分頁勾選後切來「摘要」
-        // 分頁）永遠是最新的，不需要使用者手動重新整理頁面
+        // 每次切分頁時順手刷新一次相關畫面，
+        // 確保跨分頁的狀態永遠是最新的，不需要使用者手動重新整理頁面
         if (tab === 'summary' && typeof SummaryModule !== 'undefined') {
           SummaryModule.renderPool();
         }
         if (tab === 'file' && typeof FileTransModule !== 'undefined') {
           FileTransModule.refresh();
+        }
+        if (tab === 'live' && typeof LiveTransEngine !== 'undefined') {
+          LiveTransEngine.refresh();
         }
         if (tab === 'settings' && typeof SettingsPanel !== 'undefined') {
           SettingsPanel.render();
@@ -6930,6 +7024,62 @@
       }
     };
 
+    // ---------- Groq 雲端轉寫（共用）----------
+    // 即時錄音、上傳檔案、即時翻譯三處共用：送 whisper-large-v3-turbo，
+    // 回傳轉寫純文字（內含語言偵測回報與 Key 失效通知）。
+    const GroqClient = {
+      async transcribe(blob, fileName) {
+        const apiKey = KeyPoolManager.getActiveKeyValue('groq');
+        const formData = new FormData();
+        formData.append('file', blob, fileName || 'recording.webm');
+        formData.append('model', 'whisper-large-v3-turbo');
+
+        const langParams = LanguageManager.getParamsForSegment();
+        if (langParams) {
+          formData.append('language', langParams.languageCode);
+          formData.append('prompt', langParams.prompt);
+        } else {
+          formData.append('prompt', 'This is a recording of a meeting.');
+        }
+        formData.append('response_format', 'verbose_json');
+
+        const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+        let res;
+        try {
+          res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiKey}` },
+            body: formData
+          });
+        } catch (networkErr) {
+          throw new Error(t('rec.groqNet', { err: networkErr.message }));
+        }
+
+        let data;
+        try {
+          data = await res.json();
+        } catch (parseErr) {
+          throw new Error(t('rec.groqBad', { status: res.status }));
+        }
+
+        if (!res.ok) {
+          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
+          // Groq：401 為 key 無效，429 為額度用完
+          if (res.status === 401) {
+            KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
+          } else if (res.status === 429) {
+            KeyPoolPanel.notifyFailure('groq', 'quota_exceeded', 'Groq');
+          }
+          throw new Error(apiMessage);
+        }
+
+        LanguageManager.onDetectedLanguage(data.language);
+
+        return data.text || '';
+      }
+    };
+
     // ---------- 上傳既有語音檔案轉文字 ----------
     const FileUploadTranscribe = {
       SUGGESTED_MAX_MB: 25,
@@ -7025,54 +7175,7 @@
           return text || '';
         }
 
-        const apiKey = KeyPoolManager.getActiveKeyValue('groq');
-        const formData = new FormData();
-        formData.append('file', file, file.name || 'upload.audio');
-        formData.append('model', 'whisper-large-v3-turbo');
-
-        const langParams = LanguageManager.getParamsForSegment();
-        if (langParams) {
-          formData.append('language', langParams.languageCode);
-          formData.append('prompt', langParams.prompt);
-        } else {
-          formData.append('prompt', 'This is a recording of a meeting.');
-        }
-        formData.append('response_format', 'verbose_json');
-
-        const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
-
-        let res;
-        try {
-          res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}` },
-            body: formData
-          });
-        } catch (networkErr) {
-          throw new Error(t('rec.groqNet', { err: networkErr.message }));
-        }
-
-        let data;
-        try {
-          data = await res.json();
-        } catch (parseErr) {
-          throw new Error(t('rec.groqBad', { status: res.status }));
-        }
-
-        if (!res.ok) {
-          const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
-          // Groq：401 為 key 無效，429 為額度用完
-          if (res.status === 401) {
-            KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
-          } else if (res.status === 429) {
-            KeyPoolPanel.notifyFailure('groq', 'quota_exceeded', 'Groq');
-          }
-          throw new Error(apiMessage);
-        }
-
-        LanguageManager.onDetectedLanguage(data.language);
-
-        return data.text || '';
+        return GroqClient.transcribe(file, file.name || 'upload.audio');
       },
 
       _resetInput() {
@@ -7277,8 +7380,18 @@
       stop() {
         this.isRecording = false;
         clearTimeout(this.segmentTimer);
-        if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
-          this.mediaRecorder.stop();
+        // 立即 flush 殘段：先逼出緩衝中的音訊再停，onstop 會立刻送轉寫，
+        // 不用等下一個 15 秒。若錄音器已停但還有殘段，直接送
+        //（transcribeAudio 會擋掉空 blob，不會重複）。
+        const rec = this.mediaRecorder;
+        this.mediaRecorder = null;
+        if (rec && rec.state === 'recording') {
+          try { rec.requestData(); } catch (e) {}
+          rec.stop();
+        } else if (this.audioChunks && this.audioChunks.length > 0) {
+          const leftover = new Blob(this.audioChunks, { type: 'audio/webm' });
+          this.audioChunks = [];
+          this.transcribeAudio(leftover);
         }
         if (this.stream) {
           this.stream.getTracks().forEach(track => track.stop());
@@ -7291,6 +7404,11 @@
       async transcribeAudio(audioBlob) {
         const statusText = document.getElementById('recSubText');
 
+        // 保險：空 blob（例如重複 stop 觸發的殘段）直接略過，不浪費一次 API
+        if (!audioBlob || audioBlob.size < 1000) {
+          return;
+        }
+
         const silent = await this.isSegmentSilent(audioBlob);
         if (silent) {
           if (this.isRecording && !this._pendingCount) {
@@ -7299,7 +7417,6 @@
           return;
         }
 
-        const apiKey = KeyPoolManager.getActiveKeyValue('groq');
         this._pendingCount = (this._pendingCount || 0) + 1;
         if (this.isRecording) {
           statusText.textContent = t('rec.transcribing', { n: this._pendingCount });
@@ -7369,48 +7486,12 @@
           return;
         }
 
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'recording.webm');
-        formData.append('model', 'whisper-large-v3-turbo');
-
-        const langParams = LanguageManager.getParamsForSegment();
-        if (langParams) {
-          formData.append('language', langParams.languageCode);
-          formData.append('prompt', langParams.prompt);
-        } else {
-          formData.append('prompt', 'This is a recording of a meeting.');
-        }
-
-        formData.append('response_format', 'verbose_json');
-
-        const endpoint = 'https://api.groq.com/openai/v1/audio/transcriptions';
-
         try {
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${apiKey}` },
-            body: formData
-          });
-
-          const data = await res.json();
+          const text = await GroqClient.transcribe(audioBlob, 'recording.webm');
           this._pendingCount = Math.max(0, this._pendingCount - 1);
 
-          // Groq 錯誤回應仍是合法 JSON，res.json() 不會拋例外，
-          // 必須明確檢查 res.ok，否則 401/429 會被誤判成功
-          if (!res.ok) {
-            const apiMessage = (data && data.error && data.error.message) || ('HTTP ' + res.status);
-            if (res.status === 401) {
-              KeyPoolPanel.notifyFailure('groq', 'invalid', 'Groq');
-            } else if (res.status === 429) {
-              KeyPoolPanel.notifyFailure('groq', 'quota_exceeded', 'Groq');
-            }
-            throw new Error(apiMessage);
-          }
-
-          LanguageManager.onDetectedLanguage(data.language);
-
-          if (data.text && data.text.trim()) {
-            CardSandbox.add(data.text.trim());
+          if (text && text.trim()) {
+            CardSandbox.add(text.trim());
           }
           if (this.isRecording) {
             statusText.textContent = this._pendingCount > 0
@@ -7446,6 +7527,290 @@
           btn.textContent = t('rec.start');
           status.textContent = t('rec.notStarted');
         }
+      }
+    };
+
+    // ---------- 即時翻譯（錄音 → 轉寫 → 翻譯，每段即時顯示）----------
+    // 錄音流程跟錄音分頁相同（15 秒一切段、停止立即 flush 殘段），
+    // 差別在每段轉寫完再翻成目標語言才顯示，不寫入筆記。
+    // STT 走辨識服務設定，翻譯走摘要服務設定，兩邊都要就緒。
+    const LiveTransEngine = {
+      mediaRecorder: null,
+      audioChunks: [],
+      stream: null,
+      isRecording: false,
+      segmentTimer: null,
+      SEGMENT_MS: 15000,
+      SILENCE_RMS_THRESHOLD: 0.01,
+      _pendingCount: 0,
+      results: [],
+
+      toggle() {
+        if (this.isRecording) {
+          this.stop();
+        } else {
+          this.start();
+        }
+      },
+
+      _sttReady() {
+        return AIProviderConfig.getSttProvider() !== 'groq' || !!KeyPoolManager.getActiveKeyValue('groq');
+      },
+
+      _sumReady() {
+        return AIProviderConfig.getSummaryProvider() === 'ollama' || !!KeyPoolManager.getActiveKeyValue('gemini');
+      },
+
+      // 切到分頁時刷新：就緒提示＋譯文列表（跨分頁回來也要最新）
+      refresh() {
+        const hint = document.getElementById('liveKeyMissingHint');
+        if (hint) {
+          if (!this._sttReady()) {
+            hint.classList.remove('hidden');
+            hint.textContent = t('live.needStt');
+          } else if (!this._sumReady()) {
+            hint.classList.remove('hidden');
+            hint.textContent = t('live.needSum');
+          } else {
+            hint.classList.add('hidden');
+          }
+        }
+        this.render();
+      },
+
+      async start() {
+        if (!this._sttReady()) {
+          alert(t('rec.alert.groqKey'));
+          MainNav.switchTo('settings');
+          return;
+        }
+        if (!this._sumReady()) {
+          alert(t('sum.alert.geminiKey'));
+          MainNav.switchTo('settings');
+          return;
+        }
+
+        LanguageManager.resetAutoState();
+
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: true,
+              channelCount: 1,
+              sampleRate: 48000
+            }
+          });
+
+          this.isRecording = true;
+          this.updateUI(true);
+          this.startNewSegment();
+        } catch (err) {
+          alert(t('rec.micDenied') + err.message);
+        }
+      },
+
+      startNewSegment() {
+        if (!this.isRecording || !this.stream) return;
+
+        this.mediaRecorder = new MediaRecorder(this.stream, { audioBitsPerSecond: 128000 });
+        this.audioChunks = [];
+
+        this.mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) this.audioChunks.push(e.data);
+        };
+
+        this.mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm' });
+          this.transcribeTranslate(audioBlob);
+
+          if (this.isRecording) {
+            this.startNewSegment();
+          }
+        };
+
+        this.mediaRecorder.start();
+
+        this.segmentTimer = setTimeout(() => {
+          if (this.mediaRecorder && this.mediaRecorder.state === 'recording') {
+            this.mediaRecorder.stop();
+          }
+        }, this.SEGMENT_MS);
+      },
+
+      stop() {
+        this.isRecording = false;
+        clearTimeout(this.segmentTimer);
+        // 跟錄音分頁同樣的立即 flush：殘段立刻轉寫翻譯，不等下一個 15 秒
+        const rec = this.mediaRecorder;
+        this.mediaRecorder = null;
+        if (rec && rec.state === 'recording') {
+          try { rec.requestData(); } catch (e) {}
+          rec.stop();
+        } else if (this.audioChunks && this.audioChunks.length > 0) {
+          const leftover = new Blob(this.audioChunks, { type: 'audio/webm' });
+          this.audioChunks = [];
+          this.transcribeTranslate(leftover);
+        }
+        if (this.stream) {
+          this.stream.getTracks().forEach(track => track.stop());
+          this.stream = null;
+        }
+        this.updateUI(false);
+      },
+
+      async transcribeTranslate(audioBlob) {
+        const statusText = document.getElementById('liveSubText');
+
+        // 保險：空 blob（例如重複 stop 觸發的殘段）直接略過
+        if (!audioBlob || audioBlob.size < 1000) {
+          return;
+        }
+
+        const silent = await DictationEngine.isSegmentSilent(audioBlob);
+        if (silent) {
+          if (this.isRecording && !this._pendingCount) {
+            statusText.textContent = t('live.recording');
+          }
+          return;
+        }
+
+        this._pendingCount = (this._pendingCount || 0) + 1;
+        if (this.isRecording) {
+          statusText.textContent = t('rec.transcribing', { n: this._pendingCount });
+        }
+
+        try {
+          const langParams = LanguageManager.getParamsForSegment();
+          const provider = AIProviderConfig.getSttProvider();
+          let srcText = '';
+          if (provider === 'fw') {
+            srcText = await FasterWhisperClient.transcribe(audioBlob, {
+              fileName: 'recording.webm',
+              prompt: (langParams && langParams.prompt) || 'This is a recording of a meeting.',
+              languageCode: langParams ? langParams.languageCode : undefined
+            });
+          } else if (provider === 'ollama') {
+            srcText = await OllamaClient.transcribe(audioBlob, {
+              fileName: 'recording.webm',
+              prompt: (langParams && langParams.prompt)
+                ? `${langParams.prompt} Transcribe the audio exactly as spoken. Output only the spoken words.`
+                : 'Transcribe the audio exactly as spoken. Output only the spoken words.',
+              languageCode: langParams ? langParams.languageCode : undefined
+            });
+          } else {
+            srcText = await GroqClient.transcribe(audioBlob, 'recording.webm');
+          }
+          this._pendingCount = Math.max(0, this._pendingCount - 1);
+
+          if (srcText && srcText.trim()) {
+            // 轉寫完立刻讀本段偵測到的來源語言（各家 transcribe 內部已回報），決定送哪層
+            const srcLang = LanguageManager.autoDetectedLang || '';
+            const L1 = (document.getElementById('liveTargetLang1Select') || {}).value || 'zh';
+            const L2 = (document.getElementById('liveTargetLang2Select') || {}).value || 'en';
+            for (const job of this._routeTargets(srcLang, L1, L2)) {
+              const langLabel = SummaryModule.TRANSLATE_LANGS[job.lang] || job.lang;
+              const dst = await SummaryModule.translateText(srcText.trim(), langLabel);
+              this.results.push({ src: srcText.trim(), dst, pane: job.pane, srcLang });
+            }
+            this.render();
+          }
+          if (this.isRecording) {
+            statusText.textContent = this._pendingCount > 0
+              ? t('rec.transcribing', { n: this._pendingCount })
+              : t('live.recording');
+          } else if (this._pendingCount === 0) {
+            statusText.textContent = t('live.allDone');
+          }
+        } catch (err) {
+          this._pendingCount = Math.max(0, this._pendingCount - 1);
+          console.error('即時翻譯失敗:', err);
+          if (this.isRecording) {
+            statusText.textContent = t('rec.segFailedLive', { err: err.message || err });
+          } else {
+            statusText.textContent = t('rec.segFailed', { err: err.message || err });
+          }
+        }
+      },
+
+      // 雙層路由（純函式，好測試）：
+      // - 來源＝上層語言 → 翻成下層語言，顯示在下層
+      // - 來源＝下層語言 → 翻成上層語言，顯示在上層
+      // - 偵測不出來或第三種語言 → 兩層都翻都顯示
+      // - 兩層選同一語言 → 只顯示在上層（來源已是該語言就跳過）
+      _routeTargets(srcLang, L1, L2) {
+        if (L1 === L2) {
+          if (!srcLang || srcLang !== L1) return [{ pane: 'upper', lang: L1 }];
+          return [];
+        }
+        if (srcLang === L1) return [{ pane: 'lower', lang: L2 }];
+        if (srcLang === L2) return [{ pane: 'upper', lang: L1 }];
+        return [{ pane: 'upper', lang: L1 }, { pane: 'lower', lang: L2 }];
+      },
+
+      _srcLabel(code) {
+        if (!code) return '';
+        const map = { zh: 'langName.zh', en: 'langName.en', ja: 'langName.ja', ko: 'langName.ko', de: 'langName.de' };
+        return map[code] ? t(map[code]) : code;
+      },
+
+      updateUI(recording) {
+        const card = document.getElementById('liveMeetingCard');
+        const btn = document.getElementById('liveRecordToggleBtn');
+        const status = document.getElementById('liveStatusText');
+        const sub = document.getElementById('liveSubText');
+
+        if (recording) {
+          card.classList.add('recording');
+          btn.className = 'btn-record-toggle stop';
+          btn.textContent = t('rec.stop');
+          status.textContent = t('rec.recording');
+          sub.textContent = t('rec.everySec', { sec: this.SEGMENT_MS / 1000 });
+        } else {
+          card.classList.remove('recording');
+          btn.className = 'btn-record-toggle start';
+          btn.textContent = t('rec.start');
+          status.textContent = t('rec.notStarted');
+        }
+      },
+
+      render() {
+        const up = document.getElementById('liveTransList1');
+        const low = document.getElementById('liveTransList2');
+        if (!up || !low) return;
+        const L1 = (document.getElementById('liveTargetLang1Select') || {}).value || 'zh';
+        const L2 = (document.getElementById('liveTargetLang2Select') || {}).value || 'en';
+        const h1 = document.getElementById('livePane1Lang');
+        const h2 = document.getElementById('livePane2Lang');
+        if (h1) h1.textContent = SummaryModule.TRANSLATE_LANGS[L1] || L1;
+        if (h2) h2.textContent = SummaryModule.TRANSLATE_LANGS[L2] || L2;
+        const paint = (box, items) => {
+          if (!items.length) {
+            box.innerHTML = `<div class="live-preview-empty">${t('live.emptyBox')}</div>`;
+            return;
+          }
+          box.innerHTML = items.map((r, i) => {
+            const tag = this._srcLabel(r.srcLang);
+            return `<div class="live-preview-item"><span class="idx">${i + 1}.</span>${Utils.escapeHtml(r.dst)}${tag ? ` <span class="summary-source-tag" style="cursor:default;">${Utils.escapeHtml(tag)}</span>` : ''}</div>`;
+          }).join('');
+          box.scrollTop = box.scrollHeight;
+        };
+        paint(up, this.results.filter(r => r.pane === 'upper'));
+        paint(low, this.results.filter(r => r.pane === 'lower'));
+      },
+
+      copy() {
+        if (!this.results.length) return;
+        const L1 = (document.getElementById('liveTargetLang1Select') || {}).value || 'zh';
+        const L2 = (document.getElementById('liveTargetLang2Select') || {}).value || 'en';
+        const head = l => `【${SummaryModule.TRANSLATE_LANGS[l] || l}】`;
+        const up = this.results.filter(r => r.pane === 'upper').map(r => r.dst).join('\n');
+        const low = this.results.filter(r => r.pane === 'lower').map(r => r.dst).join('\n');
+        const text = `${head(L1)}\n${up}\n\n${head(L2)}\n${low}`;
+        copyTextRobust(text).then(success => {
+          alert(success ? t('sum.trCopied') : t('sum.trCopyFail'));
+        });
       }
     };
 
