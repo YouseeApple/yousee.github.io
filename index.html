@@ -12,13 +12,19 @@
       無法列固定子網域，不放行會導致 fetch() 在跟隨轉址時被擋下。
     - liffsdk.line-scdn.net：LIFF SDK 初始化會抓多語系 manifest，
       不放行雖不影響功能（本頁固定繁中）但會在 console 噴錯。
+    - http://*:11434、http://*:8000：Ollama／Faster-Whisper 的服務位址
+      是使用者自填的（127.0.0.1、localhost、192.168.x.x 等區網 IP 都有
+      可能），無法預先列舉，改用「任意主機＋固定 port」放行。這是
+      2026-09 修過一次的 bug：之前只列 localhost，填區網 IP 的人
+      測試連線永遠 NetworkError（連 no-cors 探測都被擋），但瀏覽器
+      網址列直接開 /api/tags 卻看得到——兩者走的限制不一樣。
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net http://127.0.0.1:11434 http://localhost:11434 http://127.0.0.1:8000 http://localhost:8000 https://cdn.jsdelivr.net https://tessdata.projectnaptha.com;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net http://127.0.0.1:11434 http://localhost:11434 http://127.0.0.1:8000 http://localhost:8000 http://*:11434 http://*:8000 https://cdn.jsdelivr.net https://tessdata.projectnaptha.com;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
@@ -926,6 +932,14 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>連線測試會分辨連不上還是跨域被擋</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>Ollama「測試連線」失敗時自動加測一次：伺服器有回應但跨域被擋會明確提示加 <code>OLLAMA_ORIGINS</code>；真的連不上會列出檢查清單（含區網 IP 需設 <code>OLLAMA_HOST=0.0.0.0</code>）</li>
+              <li>測試連線先排除瀏覽器政策問題：https 頁抓 http 位址（Mixed Content）、公網頁抓區網 IP（Private Network Access）都會直接講明白，跟 Ollama 開關無關；重複的錯誤訊息也一併消除</li>
+              <li>修正 CSP 只放行 localhost 導致的 bug：填區網 IP（如 192.168.x.x）時測試連線永遠失敗（連探測都被擋），但瀏覽器直接開網址卻看得到。現改為放行任意主機的 11434／8000 port</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>即時翻譯改雙層＋自動分流</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>即時翻譯改<b>上下兩層</b>，各選一種目標語言（預設上層中文、下層英文）；AI 自動判斷說話語言翻成另一層顯示，判斷不出來時兩層都顯示，每句附來源語言標籤</li>
@@ -2349,7 +2363,6 @@
       'file.confirmRemove': '確定要清除已上傳的文件與譯文嗎？'
     });
     Object.assign(STRINGS.zh, {
-      'err.ollamaListConn': '連不上 {base}（{err}）。請確認 ollama serve 有啟動，且啟動時有設定 OLLAMA_ORIGINS 允許這個頁面的網域跨域存取。',
       'err.ollamaListFail': '讀取模型清單失敗（HTTP {status}）',
       'err.ollamaListJson': '模型清單回應不是 JSON 格式',
       'err.ollamaConn': '連不上 Ollama（{base}）：{err}。請確認 ollama serve 有啟動＋OLLAMA_ORIGINS 允許跨域。',
@@ -2370,7 +2383,10 @@
       'cfg.savedFw': '已儲存 Faster-Whisper 設定。',
       'cfg.testing': '連線測試中...',
       'cfg.connOk': '✅ 連線成功，本機共有 {n} 個模型。',
-      'cfg.connFail': '❌ 連線失敗：{err}（請確認 ollama serve 已啟動＋OLLAMA_ORIGINS 允許跨域）',
+      'cfg.connFail': '❌ 連不上 {base}：{err}\n請依序檢查：① Ollama 有啟動；② 填區網 IP（如 192.168.x.x）時，啟動需設 OLLAMA_HOST=0.0.0.0（預設只聽本機）；③ 防火牆放行 port；④ 若本頁是 https 開的，http 位址會被瀏覽器擋掉。',
+      'cfg.connCors': '⚠️ 伺服器有回應，但瀏覽器跨域被擋。Ollama 啟動時請加 OLLAMA_ORIGINS=*（或你的頁面網址），重啟後再按測試連線。',
+      'cfg.connMixed': '⛔ 本頁是 https 開啟的，瀏覽器一律禁止它連線 http:// 位址（Mixed Content），跟 Ollama 開關無關。\n解法：改用 http:// 在區網內開啟本頁（例如直接點開 index.html，或把本頁放到區網的 http 主機上），再按測試連線。',
+      'cfg.connPna': '⛔ 本頁是從網際網路開啟的，瀏覽器會擋掉對區網 IP（192.168.x.x 等）的連線（Private Network Access），跟 Ollama 開關無關。\n解法：改用區網內的 http:// 位址開啟本頁（或直接點開 index.html 檔案），再按測試連線。',
       'cfg.modelsList': '本機模型（{n}）：{list}{ellipsis}',
       'cfg.noModels': '本機目前沒有已安裝的模型，請先執行 ollama pull。',
       'cfg.modelsFail': '⚠️ 讀不到模型清單：{err}',
@@ -2886,7 +2902,42 @@
           await this.refreshModels(isSum ? 'summary' : 'stt');
         } catch (err) {
           console.error('Ollama 連線測試失敗：', err);
-          if (hint) hint.textContent = t('cfg.connFail', { err: err.message });
+          // 先排除瀏覽器政策問題（跟 Ollama 開關無關，一測就知道）：
+          // ① https 頁抓 http:// 位址＝Mixed Content，必擋；
+          // ② 公網頁抓區網 IP＝Private Network Access，必擋。
+          // 這兩種連 no-cors 探測都會被擋，必須先看這個。
+          let policyMsg = '';
+          try {
+            const pageProto = (typeof location !== 'undefined' && location.protocol) || '';
+            const pageHost = (typeof location !== 'undefined' && location.hostname) || '';
+            const targetHost = (base.match(/^https?:\/\/([^/:]+)/) || [])[1] || '';
+            const isPrivate = h => {
+              const s = String(h || '').toLowerCase();
+              if (s === 'localhost' || s === '[::1]') return true;
+              if (/^(127\.|10\.|192\.168\.)/.test(s)) return true;
+              return /^(172\.(1[6-9]|2\d|3[01])\.)/.test(s);
+            };
+            if (pageProto === 'https:' && base.startsWith('http://')) {
+              policyMsg = t('cfg.connMixed');
+            } else if (pageProto === 'http:' && pageHost && !isPrivate(pageHost) && isPrivate(targetHost)) {
+              policyMsg = t('cfg.connPna');
+            }
+          } catch (e3) {}
+          if (policyMsg) {
+            if (hint) hint.textContent = policyMsg;
+            return;
+          }
+          // 進階診斷：no-cors 探測只測 TCP 通不通（有回應即 resolve），
+          // 可分辨「根本連不上」還是「連得上但 CORS 被擋」
+          let reachable = false;
+          try {
+            reachable = await OllamaClient.probeReachable(base);
+          } catch (e2) {}
+          if (hint) {
+            hint.textContent = reachable
+              ? t('cfg.connCors')
+              : t('cfg.connFail', { base, err: err.message });
+          }
         }
       },
       // 舊入口保留
@@ -3014,7 +3065,9 @@
         try {
           res = await fetch(base + '/api/tags');
         } catch (networkErr) {
-          throw new Error(t('err.ollamaListConn', { base, err: networkErr.message || networkErr.name }));
+          // 原樣拋出：上層（測試連線／模型清單）會各自組出完整提示，
+          // 這裡不再包一層，避免「連不上…：連不上…」疊字
+          throw networkErr;
         }
         if (!res.ok) throw new Error(t('err.ollamaListFail', { status: res.status }));
         let data;
@@ -3022,6 +3075,19 @@
         catch (e) { throw new Error(t('err.ollamaListJson')); }
         const models = (data.models || []).map(m => m.name).filter(Boolean);
         return models;
+      },
+
+      // 連通探測：no-cors 的 GET 只測 TCP 通不通（有回應即 resolve，
+      // 拿 opaque 回應），用來分辨「根本連不上」還是「連得上但 CORS 被擋」。
+      // 瀏覽器刻意不給細節，這是唯一合法的分辨手段。
+      async probeReachable(baseUrl) {
+        const base = (baseUrl || AIProviderConfig.getBaseUrl()).replace(/\/+$/, '');
+        try {
+          await fetch(base + '/api/tags', { mode: 'no-cors' });
+          return true;
+        } catch (e) {
+          return false;
+        }
       },
 
       _summarySystemPrompt(sourceNote) {
@@ -3656,7 +3722,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-live-dual';
+    const APP_VERSION = '2026-09-csp-lan';
 
     const IntroModal = {
       switchTab(tab) {
