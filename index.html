@@ -17,21 +17,21 @@
     script-src 'self' https://cdn.jsdelivr.net https://static.line-scdn.net 'unsafe-inline';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data:;
-    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net http://127.0.0.1:11434 http://localhost:11434 http://127.0.0.1:8000 http://127.0.0.1:8000;
+    connect-src 'self' https://api.groq.com https://api.line.me https://access.line.me https://generativelanguage.googleapis.com https://docs.google.com https://*.googleusercontent.com https://liffsdk.line-scdn.net http://127.0.0.1:11434 http://localhost:11434 http://127.0.0.1:8000 http://localhost:8000 https://cdn.jsdelivr.net https://tessdata.projectnaptha.com;
     frame-src https://access.line.me;
     base-uri 'self';
     form-action 'none';
   ">
-  <title>語音卡片筆記-語音轉文字Linebot</title>
-  <meta name="description" content="語音卡片筆記：免登入、免加好友，開啟即用的語音轉文字筆記工具。支援錄音、共享 Google Sheet 筆記、AI 摘要，辨識與摘要可在 Groq／Gemini 雲端與地端 Ollama 之間切換，不用另外安裝 App。">
+  <title>行政小助手-會議紀錄/翻譯/報帳</title>
+  <meta name="description" content="行政小助手：免登入、免加好友，開啟即用的語音轉文字筆記工具。支援錄音、共享 Google Sheet 筆記、AI 摘要，辨識與摘要可在 Groq／Gemini 雲端與地端 Ollama 之間切換，不用另外安裝 App。">
 
   <!-- Open Graph：讓 LINE /社群分享連結時顯示正確標題與描述。
        不加 canonical／結構化資料：頁面有 LIFF 登入閘門
        （見 AccessGate），爬蟲進不去 mainApp 內容，加了沒有意義。 -->
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="語音卡片筆記">
+  <meta property="og:site_name" content="行政小助手">
   <meta property="og:locale" content="zh_TW">
-  <meta property="og:title" content="語音卡片筆記-語音轉文字Linebot">
+  <meta property="og:title" content="行政小助手-會議紀錄/翻譯/報帳">
   <meta property="og:description" content="免登入就能錄音、記筆記、AI 摘要，一鍵完成，不用安裝其他 App。支援地端 Ollama。">
   <style>
     :root {
@@ -431,7 +431,7 @@
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-    /* 主導覽 6 分頁列，sticky 固定頂部，切分頁不需重新捲動 */
+    /* 主導覽 7 分頁列，sticky 固定頂部，切分頁不需重新捲動（＋白版外部連結鈕） */
     .main-tabs {
       display: flex; position: sticky; top: 0; z-index: 9;
       background: var(--card-bg); border-bottom: 1px solid var(--border);
@@ -599,6 +599,27 @@
       margin-top: 10px; font-size: 11.5px; color: var(--ink-faint);
       word-break: break-all;
     }
+
+    /* 發票頁：預覽圖＋可編輯欄位＋原始辨識文字 */
+    .inv-preview { max-width: 100%; border-radius: 10px; margin-top: 12px; display: none; }
+    .inv-preview.show { display: block; }
+    .inv-fields { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+    .inv-field-row { display: flex; gap: 8px; align-items: center; }
+    .inv-field-row label { flex: 0 0 56px; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+    .inv-field-row input {
+      flex: 1; padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px;
+      font-size: 13px; box-sizing: border-box; background: var(--bg); min-width: 0;
+    }
+    .inv-field-row input:focus { outline: none; border-color: var(--line-green); background: var(--card-bg); }
+    .inv-raw {
+      margin-top: 4px; padding: 10px 12px; background: var(--bg);
+      border-radius: 10px; font-size: 12px; line-height: 1.7; color: var(--ink-soft);
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 160px; overflow-y: auto; display: none;
+    }
+    .inv-raw.show { display: block; }
+    .inv-btn-row { display: flex; gap: 8px; margin-top: 4px; }
+    .inv-btn-row .btn-summary-generate { margin-top: 0; }
 
     .summary-actions-row {
       display: flex; align-items: center; justify-content: space-between;
@@ -834,6 +855,21 @@
   <script defer src="https://cdn.jsdelivr.net/npm/mammoth@1.9.1/mammoth.browser.min.js"
           integrity="sha384-Dmql2RDFhRnFI5K9k2OlF+n+0KL1nR4scY5Akjy8jw8GEbmChSzpsB6Q4Mv+xF0L"
           crossorigin="anonymous"></script>
+  <!--
+    發票 OCR 用：tesseract.js（v5 UMD，瀏覽器本機辨識中英文）。
+    版本鎖定＋SRI；辨識語料（chi_tra/eng）執行時才從
+    tessdata.projectnaptha.com 下載（已放行 connect-src）。
+  -->
+  <script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
+          integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F"
+          crossorigin="anonymous"></script>
+  <!--
+    發票 QR 解碼用：jsQR（MIT、無依賴，純前端讀 QR）。
+    版本鎖定＋SRI；在本機 canvas 上解碼，不上傳。
+  -->
+  <script defer src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"
+          integrity="sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx"
+          crossorigin="anonymous"></script>
 </head>
 <body>
   <!-- 首次進站提示彈窗：兩頁（注意事項／更新內容），關閉後記住已讀版本，
@@ -873,6 +909,15 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>白版＋發票OCR</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>導覽列新增<b>「🎨 白版」</b>：點一下直接開新分頁到小畫家白板，開會同時手寫，兩邊並行</li>
+              <li>導覽列新增<b>「🧾 發票」</b>：上傳發票圖片或手機拍照，本機 OCR 辨識號碼／日期／統編／金額（欄位可手改，號碼與統編不限定固定碼數），一鍵存成一張新筆記</li>
+              <li>發票有 QR Code 會優先解碼：直接讀出<b>購買明細（品名×數量＝金額）</b>及 QR 內的號碼／日期／統編／含稅總額；無 QR 時由辨識文字推測品項（會標示請核對），明細一併存進筆記</li>
+              <li>「📄 翻譯」分頁改名為<b>「文件翻譯」</b></li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>語系外掛＋api.json 管語言＋自動覆蓋</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>英文字典搬到 <b><code>en.json</code></b>：有這個檔才出現 English 選項，沒有就只有繁體中文（中文維持內建）</li>
@@ -1248,7 +1293,13 @@
         <span class="tab-icon">📝</span><span class="tab-label" data-i18n="nav.summary">摘要</span>
       </button>
       <button id="navTabFile" onclick="MainNav.switchTo('file')">
-        <span class="tab-icon">📄</span><span class="tab-label" data-i18n="nav.file">翻譯</span>
+        <span class="tab-icon">📄</span><span class="tab-label" data-i18n="nav.file">文件翻譯</span>
+      </button>
+      <button id="navTabBoard" onclick="Whiteboard.open()">
+        <span class="tab-icon">🎨</span><span class="tab-label" data-i18n="nav.board">白版</span>
+      </button>
+      <button id="navTabInvoice" onclick="MainNav.switchTo('invoice')">
+        <span class="tab-icon">🧾</span><span class="tab-label" data-i18n="nav.invoice">發票</span>
       </button>
       <button id="navTabSettings" onclick="MainNav.switchTo('settings')">
         <span class="tab-icon">⚙️</span><span class="tab-label" data-i18n="nav.settings">設定</span>
@@ -1256,7 +1307,7 @@
     </div>
 
     <main>
-      <!-- ============ Tab 1／6：錄音 ============ -->
+      <!-- ============ Tab 1／7：錄音 ============ -->
       <div id="navPanelRecord" class="nav-panel">
         <!-- 只在 Key 未設定時顯示，點擊直接跳轉設定分頁 -->
         <div class="key-missing-hint hidden" id="recordKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="rec.keyMissing">
@@ -1323,7 +1374,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 2／6：筆記（語音卡片） ============ -->
+      <!-- ============ Tab 2／7：筆記（語音卡片） ============ -->
       <div id="navPanelCards" class="nav-panel hidden">
         <div class="copy-sheet-format-row">
           <button class="btn-copy-sheet-format" onclick="CopyToSheetFormat.copy()" data-i18n-title="notes.copySheetTitle" title="把目前所有卡片內容整理成一包資料，貼到 Google Sheet 空白儲存格即可" data-i18n="notes.copySheet">
@@ -1340,7 +1391,7 @@
         <div class="cards" id="cardsList"></div>
       </div>
 
-      <!-- ============ Tab 3／6：共享筆記 ============ -->
+      <!-- ============ Tab 3／7：共享筆記 ============ -->
       <div id="navPanelShared" class="nav-panel hidden">
         <!-- 唯讀查看共享 Google Sheet 筆記，可勾選並與語音卡片混合送去
              「摘要」分頁生成，順序依勾選先後決定。完全不寫入 Sheet -->
@@ -1376,7 +1427,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 4／6：AI 摘要 ============ -->
+      <!-- ============ Tab 4／7：AI 摘要 ============ -->
       <div id="navPanelSummary" class="nav-panel hidden">
         <!-- 摘要來源讀取 SelectionPool（卡片+共享筆記統一勾選池） -->
         <div class="key-missing-hint hidden" id="summaryKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="sum.keyMissing">
@@ -1483,7 +1534,7 @@
         </div>
       </div>
 
-      <!-- ============ Tab 5／6：文件翻譯 ============ -->
+      <!-- ============ Tab 5／7：文件翻譯 ============ -->
       <div id="navPanelFile" class="nav-panel hidden">
         <!-- 翻譯走摘要服務的共用設定，未就緒時顯示此提示 -->
         <div class="key-missing-hint hidden" id="fileKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="file.keyMissing">
@@ -1529,7 +1580,47 @@
         </div>
       </div>
 
-      <!-- ============ Tab 6／6：設定 ============ -->
+      <!-- ============ Tab 6／7：發票OCR ============ -->
+      <div id="navPanelInvoice" class="nav-panel hidden">
+        <div class="upload-panel">
+          <div class="upload-panel-label" data-i18n="inv.upTitle">🧾 上傳發票</div>
+          <div class="upload-panel-desc" data-i18n="inv.upDesc">上傳發票照片或圖片檔，也可以用手機直接拍照。辨識在本機進行，免 Key；有 QR Code 會優先讀取明細，無 QR 時由辨識文字推測品項；數字僅供參考，存檔前請先核對。</div>
+          <div class="inv-btn-row" style="justify-content:center;">
+            <label class="btn-upload-choose" for="invFileInput" data-i18n="inv.upload">📁 上傳圖片</label>
+            <label class="btn-upload-choose" for="invCameraInput" data-i18n="inv.camera">📷 拍照</label>
+          </div>
+          <input type="file" id="invFileInput" accept="image/*" onchange="InvoiceModule.onFileSelected(this.files)">
+          <input type="file" id="invCameraInput" accept="image/*" capture="environment" onchange="InvoiceModule.onFileSelected(this.files)">
+          <div class="upload-file-name" id="invFileName"></div>
+          <img class="inv-preview" id="invPreview" alt="">
+          <div class="upload-progress-row" id="invProgressRow">
+            <div class="upload-progress-spinner"></div>
+            <span id="invProgressText" data-i18n="inv.parsing">辨識中...</span>
+          </div>
+        </div>
+
+        <div class="summary-panel" id="invPanel">
+          <div class="inv-fields">
+            <div class="inv-field-row"><label data-i18n="inv.no">號碼</label><input type="text" id="invNo" placeholder="AB12345678" autocomplete="off"></div>
+            <div class="inv-field-row"><label data-i18n="inv.date">日期</label><input type="text" id="invDate" placeholder="2026/09/07" autocomplete="off"></div>
+            <div class="inv-field-row"><label data-i18n="inv.taxId">統編</label><input type="text" id="invTaxId" placeholder="12345678" inputmode="numeric" autocomplete="off"></div>
+            <div class="inv-field-row"><label data-i18n="inv.amount">金額</label><input type="text" id="invAmount" placeholder="0" inputmode="decimal" autocomplete="off"></div>
+          </div>
+          <div class="inv-btn-row">
+            <button class="shared-notes-select-all-btn" style="padding:10px;" onclick="InvoiceModule.recognize()" data-i18n="inv.retry">🔄 重新辨識</button>
+            <button class="shared-notes-select-all-btn" style="padding:10px;" onclick="InvoiceModule.clear()" data-i18n="inv.clear">✕ 清除</button>
+          </div>
+          <div id="invItemsSection" style="display:none; margin-top:12px;">
+            <div class="lang-select-label" style="margin-bottom:6px;" data-i18n="inv.items">📋 購買明細</div>
+            <div class="action-items-list" id="invItemsList"></div>
+            <div class="keypool-count-hint" id="invItemsHint"></div>
+          </div>
+          <div class="inv-raw" id="invRawText"></div>
+          <button class="btn-summary-generate" style="margin-top:12px;" onclick="InvoiceModule.saveToNotes()" data-i18n="inv.save">📝 存到筆記</button>
+        </div>
+      </div>
+
+      <!-- ============ Tab 7／7：設定 ============ -->
       <div id="navPanelSettings" class="nav-panel hidden">
         <div class="provider-switch-row">
           <span class="provider-switch-label" data-i18n="settings.uiLang">🌐 介面語言</span>
@@ -1717,7 +1808,7 @@
         </div>
 
         <div class="settings-app-info">
-          <span data-i18n="cfg.appName">語音卡片筆記 · LIFF 相容版</span><br>
+          <span data-i18n="cfg.appName">行政小助手 · LIFF 相容版</span><br>
           <span data-i18n="cfg.version">版本：</span><span id="settingsAppVersion"></span>
         </div>
       </div>
@@ -1845,12 +1936,12 @@
     // 找不到 key 時退回中文，再退回 key 本身，不會炸掉畫面。
     const STRINGS = { zh: {}, en: {} };
     Object.assign(STRINGS.zh, {
-      'meta.title': '語音卡片筆記-語音轉文字Linebot',
+      'meta.title': '行政小助手-會議紀錄/翻譯/報帳',
       'nav.record': '錄音',
       'nav.cards': '筆記',
       'nav.shared': '共享',
       'nav.summary': '摘要',
-      'nav.file': '翻譯',
+      'nav.file': '文件翻譯',
       'nav.settings': '設定',
       'settings.uiLang': '🌐 介面語言'
     });
@@ -2013,7 +2104,7 @@
       'cfg.dangerTitle': '⚠️ 危險區域',
       'cfg.dangerDesc': '一次清除這台裝置上的所有 API Key、卡片草稿、摘要、分享中斷記錄與已讀提示記錄。<b>此動作無法復原</b>，適合在共用裝置使用完畢後執行。',
       'cfg.wipeAll': '🗑️ 刪除全部本機資料',
-      'cfg.appName': '語音卡片筆記 · LIFF 相容版',
+      'cfg.appName': '行政小助手 · LIFF 相容版',
       'cfg.version': '版本：',
       'act.sendToRoom': '📥 送回聊天室',
       'act.shareOut': '🔗 分享出去 ▾'
@@ -2376,6 +2467,32 @@
     Object.assign(STRINGS.zh, {
       'err.fwListConn': '連不上 {base}（{err}）。請確認 Faster-Whisper 服務已啟動，且有開 CORS（瀏覽器直連需要）＋防火牆沒有擋 port。',
       'fw.allFailed': '三種轉寫端點（/v1/audio/transcriptions、/asr、/inference）都失敗，請確認服務種類與位址。'
+    });
+    Object.assign(STRINGS.zh, {
+      'nav.board': '白版',
+      'nav.invoice': '發票',
+      'inv.upTitle': '🧾 上傳發票',
+      'inv.upDesc': '上傳發票照片或圖片檔，也可以用手機直接拍照。辨識在本機進行，免 Key；有 QR Code 會優先讀取明細，無 QR 時由辨識文字推測品項；數字僅供參考，存檔前請先核對。',
+      'inv.upload': '📁 上傳圖片',
+      'inv.camera': '📷 拍照',
+      'inv.no': '號碼',
+      'inv.date': '日期',
+      'inv.taxId': '統編',
+      'inv.amount': '金額',
+      'inv.retry': '🔄 重新辨識',
+      'inv.clear': '✕ 清除',
+      'inv.save': '📝 存到筆記',
+      'inv.parsing': '辨識中...',
+      'inv.progress': '辨識中…{p}%',
+      'inv.badType': '請選擇圖片檔。',
+      'inv.noImage': '請先上傳或拍攝發票圖片。',
+      'inv.needLib': 'OCR 套件尚未載入，請確認網路後重新整理頁面。',
+      'inv.fail': '辨識失敗：{err}',
+      'inv.noData': '請先辨識或填寫發票資料再存檔。',
+      'inv.saved': '已存到筆記，可到「🗂️ 筆記」分頁查看。',
+      'inv.items': '📋 購買明細',
+      'inv.itemsQr': '✅ 明細來自發票 QR Code，直接可信',
+      'inv.itemsOcr': '🔍 明細由辨識文字推測，請核對'
     });
     /*__I18N_DICT__*/
 
@@ -3440,7 +3557,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-i18n-ext';
+    const APP_VERSION = '2026-09-invoice-items';
 
     const IntroModal = {
       switchTab(tab) {
@@ -4113,7 +4230,7 @@
       switchTo(tab) {
         this.current = tab;
 
-        const tabs = ['record', 'cards', 'shared', 'summary', 'file', 'settings'];
+        const tabs = ['record', 'cards', 'shared', 'summary', 'file', 'invoice', 'settings'];
         tabs.forEach(t => {
           const btn = document.getElementById('navTab' + this._capitalize(t));
           const panel = document.getElementById('navPanel' + this._capitalize(t));
@@ -6384,6 +6501,413 @@
       _resetInput() {
         const input = document.getElementById('docFileInput');
         if (input) input.value = '';
+      }
+    };
+
+    // ---------- 電子白版（外部連結）----------
+    // 純粹開新分頁，不進 MainNav（沒有對應 panel 可以切）
+    const Whiteboard = {
+      URL: '經典小畫家白板.html',
+      open() {
+        window.open(this.URL, '_blank', 'noopener');
+      }
+    };
+
+    // ---------- 發票 OCR（拍照／上傳 → 本機辨識 → 存筆記）----------
+    // Tesseract.js 跑在瀏覽器本機（chi_tra+eng），圖片不上傳任何地方。
+    // 號碼／日期／統編／金額只是啟發式擷取，欄位保持可手動修改，
+    // 按下存檔才寫進筆記。拍糊、傾斜嚴重的照片請重拍。
+    const InvoiceModule = {
+      MAX_DIM: 1600,
+      WORKER_URL: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+      imageBlob: null,
+      isWorking: false,
+      items: [],
+      itemsFromQr: false,
+
+      onFileSelected(fileList) {
+        if (!fileList || !fileList.length) return;
+        if (this.isWorking) return;
+        const file = fileList[0];
+        if (!file.type || !file.type.startsWith('image/')) {
+          alert(t('inv.badType'));
+          this._resetInputs();
+          return;
+        }
+        document.getElementById('invFileName').textContent =
+          t('up.chosen', { name: file.name, size: (file.size / 1048576).toFixed(1) });
+        this._downscale(file);
+      },
+
+      // 大照片先縮到最長邊 1600px：OCR 又快又準，也省記憶體
+      async _downscale(file) {
+        this._setProgress(true, t('inv.parsing'));
+        try {
+          const bmp = await createImageBitmap(file);
+          const scale = Math.min(1, this.MAX_DIM / Math.max(bmp.width, bmp.height));
+          const w = Math.max(1, Math.round(bmp.width * scale));
+          const h = Math.max(1, Math.round(bmp.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(bmp, 0, 0, w, h);
+          if (bmp.close) bmp.close();
+          const blob = await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('canvas')), 'image/jpeg', 0.92));
+          this.imageBlob = blob;
+          // 新圖片＝新發票，舊明細先清掉，等辨識完重建
+          this.items = [];
+          this.itemsFromQr = false;
+          this._renderItems();
+          const preview = document.getElementById('invPreview');
+          if (preview) {
+            if (preview.src && preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+            preview.src = URL.createObjectURL(blob);
+            preview.classList.add('show');
+          }
+          this.recognize();
+        } catch (err) {
+          console.error('圖片處理失敗：', err);
+          alert(t('inv.fail', { err: err.message || err }));
+          this._setProgress(false);
+        } finally {
+          this._resetInputs();
+        }
+      },
+
+      async recognize() {
+        if (this.isWorking) return;
+        if (!this.imageBlob) {
+          alert(t('inv.noImage'));
+          return;
+        }
+        if (typeof Tesseract === 'undefined') {
+          alert(t('inv.needLib'));
+          return;
+        }
+        this.isWorking = true;
+        this._setProgress(true, t('inv.parsing'));
+        try {
+          // QR 先行（快且準）：左右半各解一次，兩顆 QR 都收
+          let qr = { no: '', date: '', sellerTax: '', total: 0, items: [] };
+          try {
+            const codes = await this._decodeQr();
+            for (const c of codes) {
+              const r = this._parseQrPayload(c.data, c.binary);
+              if (!qr.no && r.no) {
+                qr.no = r.no;
+                qr.date = r.date;
+                qr.sellerTax = r.sellerTax;
+                qr.total = r.total;
+              }
+              for (const it of r.items) {
+                if (!qr.items.some(x => x.name === it.name && x.qty === it.qty && x.price === it.price)) {
+                  qr.items.push(it);
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('QR 解析略過，改走 OCR：', e);
+          }
+          const { data: { text } } = await Tesseract.recognize(this.imageBlob, 'chi_tra+eng', {
+            logger: m => {
+              if (m && m.status === 'recognizing text' && typeof m.progress === 'number') {
+                this._setProgress(true, t('inv.progress', { p: Math.round(m.progress * 100) }));
+              }
+            },
+            workerPath: this.WORKER_URL
+          });
+          const raw = (text || '').trim();
+          const box = document.getElementById('invRawText');
+          if (box) {
+            box.textContent = raw;
+            box.classList.toggle('show', !!raw);
+          }
+          const f = this._parseInvoice(raw);
+          // QR 較可信，優先採用；OCR 補 QR 沒有的缺口
+          const no = qr.no || f.no;
+          const date = qr.date || f.date;
+          const taxId = qr.sellerTax || f.taxId;
+          let amount = f.amount;
+          if (qr.total) amount = this._fmtMoney(qr.total);
+          if (no) document.getElementById('invNo').value = no;
+          if (date) document.getElementById('invDate').value = date;
+          if (taxId) document.getElementById('invTaxId').value = taxId;
+          if (amount) document.getElementById('invAmount').value = amount;
+          // 明細：有 QR 用 QR 的，否則由 OCR 文字推測
+          this.items = qr.items.length ? qr.items : this._parseItemsFromOcr(raw);
+          this.itemsFromQr = qr.items.length > 0;
+          this._renderItems();
+        } catch (err) {
+          console.error('發票辨識失敗：', err);
+          alert(t('inv.fail', { err: err.message || err }));
+        } finally {
+          this.isWorking = false;
+          this._setProgress(false);
+        }
+      },
+
+      // QR 解碼：發票左右兩顆 QR 並排，全圖先試一次，再切左右半
+      // （各多取 8% 重疊）各試一次，jsQR 一次只解一顆。全部本機運算。
+      async _decodeQr() {
+        if (typeof jsQR === 'undefined' || !this.imageBlob) return [];
+        const bmp = await createImageBitmap(this.imageBlob);
+        try {
+          const scale = Math.min(1, 1000 / Math.max(bmp.width, bmp.height));
+          const w = Math.max(1, Math.round(bmp.width * scale));
+          const h = Math.max(1, Math.round(bmp.height * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(bmp, 0, 0, w, h);
+          const regions = [
+            [0, 0, w, h],
+            [0, 0, Math.round(w * 0.58), h],
+            [Math.round(w * 0.42), 0, w - Math.round(w * 0.42), h]
+          ];
+          const found = [];
+          for (const [x, y, rw, rh] of regions) {
+            try {
+              const img = ctx.getImageData(x, y, rw, rh);
+              const code = jsQR(img.data, rw, rh);
+              if (code && code.data && !found.some(f => f.data === code.data)) {
+                found.push({ data: code.data, binary: code.binaryData });
+              }
+            } catch (e) { /* 這塊解不出就換下一塊 */ }
+          }
+          return found;
+        } finally {
+          if (bmp.close) bmp.close();
+        }
+      },
+
+      // 電子發票 QR 解析（財政部規格）：
+      // 左 QR＝77 碼固定頭（字軌10＋日期7＋隨機4＋未稅8hex＋含稅8hex＋
+      // 買方8＋賣方8＋驗證24）＋「:使用區10:完整筆數:總筆數:編碼:
+      // 品名:數量:單價…」；右 QR＝「**」開頭＋接續的「品名:數量:單價…」。
+      // 中文若非 UTF-8（Big5 參數），用 binary 重解一次。
+      _parseQrPayload(raw, binary) {
+        const cands = [(raw || '').trim()];
+        if (binary && binary.length && /�/.test(cands[0])) {
+          try {
+            const t2 = new TextDecoder('big5').decode(binary).trim();
+            if (t2) cands.unshift(t2);
+          } catch (e) {}
+        }
+        for (const text of cands) {
+          const r = this._parseQrText(text);
+          if (r.no || r.items.length) return r;
+        }
+        return { no: '', date: '', sellerTax: '', total: 0, items: [] };
+      },
+
+      _parseQrText(text) {
+        const out = { no: '', date: '', sellerTax: '', total: 0, items: [] };
+        if (!text) return out;
+        const parseItems = arr => {
+          const items = [];
+          for (let i = 0; i + 2 < arr.length + 1 && items.length < 50; i += 3) {
+            const name = (arr[i] || '').trim();
+            const qty = parseFloat(arr[i + 1]);
+            const price = parseFloat(arr[i + 2]);
+            if (!name || !isFinite(qty) || !isFinite(price)) break;
+            items.push({ name, qty, price, total: qty * price });
+          }
+          return items;
+        };
+        if (text.startsWith('**')) {
+          // 右 QR：接續品項
+          const parts = text.slice(2).split(':').map(s => s.trim()).filter(s => s !== '');
+          out.items = parseItems(parts);
+          return out;
+        }
+        // 左 QR：先驗固定頭長相（10 碼字軌＋7 碼全數字日期）
+        if (text.length < 77 || !/^[A-Z0-9]{10}/.test(text) || !/^\d{7}$/.test(text.slice(10, 17))) return out;
+        out.no = text.slice(0, 10);
+        const y = parseInt(text.slice(10, 13), 10) + 1911;
+        out.date = `${y}/${text.slice(13, 15)}/${text.slice(15, 17)}`;
+        const total = parseInt(text.slice(29, 37), 16);
+        if (isFinite(total)) out.total = total;
+        const seller = text.slice(45, 53);
+        if (/^\d{7,10}$/.test(seller) && seller !== '00000000') out.sellerTax = seller;
+        const rest = text.slice(77).split(':').map(s => s.trim()).filter(s => s !== '');
+        // rest[0]=使用區 [1]=完整筆數 [2]=總筆數 [3]=編碼參數，之後每 3 個一組
+        if (rest.length > 4) out.items = parseItems(rest.slice(4));
+        return out;
+      },
+
+      // 無 QR 時：從 OCR 文字行推測品項。接受「品名 N1 N2」
+      // （數量 單價）、「品名 xN 金額」「品名*N 金額」、
+      // 「品名 金額」（數量視為 1）。排除總計／統編／日期／號碼行，
+      // 上限 30 筆避免垃圾。金額一律取行尾數字。
+      _parseItemsFromOcr(text) {
+        const items = [];
+        if (!text) return items;
+        const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+        const skipRe = /總計|合計|總額|應付|應收|實收|現金|刷卡|小計|統編|統一編號|發票號|日期|隨機|買方|賣方|電話|地址|載具|TOTAL|AMOUNT|TAX|BALANCE|CHANGE|CASH/i;
+        const bareName = s => s.replace(/[\d\s.,$NT¥元塊]/g, '');
+        for (const ln of lines) {
+          if (skipRe.test(ln)) continue;
+          if (/[A-Z]{2}\d{6,10}/.test(ln)) continue;
+          if (/(1[01]\d|20\d{2})[\/\-.年]\d{1,2}[\/\-.月]\d{1,2}/.test(ln)) continue;
+          let m = ln.match(/^(.+?)\s*[x×*]\s*(\d+(?:\.\d+)?)\s+([\d,]+\.?\d*)\s*$/);
+          if (m && bareName(m[1]).length >= 1) {
+            const qty = parseFloat(m[2]);
+            const total = parseFloat(m[3].replace(/,/g, ''));
+            if (isFinite(qty) && qty > 0 && isFinite(total) && total > 0) {
+              items.push({ name: m[1].trim(), qty, price: total / qty, total });
+              if (items.length >= 30) break;
+              continue;
+            }
+          }
+          m = ln.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s+([\d,]+\.?\d*)\s*$/);
+          if (m && bareName(m[1]).length >= 2) {
+            const qty = parseFloat(m[2]);
+            const unit = parseFloat(m[3].replace(/,/g, ''));
+            if (isFinite(qty) && qty > 0 && qty <= 9999 && isFinite(unit) && unit > 0) {
+              items.push({ name: m[1].trim(), qty, price: unit, total: qty * unit });
+              if (items.length >= 30) break;
+              continue;
+            }
+          }
+          m = ln.match(/^(.+?)\s+([\d,]+\.?\d*)\s*$/);
+          if (m && bareName(m[1]).length >= 2) {
+            const total = parseFloat(m[2].replace(/,/g, ''));
+            if (isFinite(total) && total > 0) {
+              items.push({ name: m[1].trim(), qty: 1, price: total, total });
+              if (items.length >= 30) break;
+            }
+          }
+        }
+        return items;
+      },
+
+      _fmtMoney(n) {
+        if (!isFinite(n)) return '';
+        return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+      },
+
+      _renderItems() {
+        const section = document.getElementById('invItemsSection');
+        const list = document.getElementById('invItemsList');
+        const hint = document.getElementById('invItemsHint');
+        if (!section || !list) return;
+        if (!this.items || !this.items.length) {
+          section.style.display = 'none';
+          return;
+        }
+        section.style.display = '';
+        list.innerHTML = this.items.map(it =>
+          `<div class="action-item-row"><span class="action-item-task">${Utils.escapeHtml(it.name)}</span>` +
+          `<span class="action-item-owner">×${it.qty}</span>` +
+          `<span class="action-item-deadline">${this._fmtMoney(it.total)}</span></div>`
+        ).join('');
+        if (hint) hint.textContent = t(this.itemsFromQr ? 'inv.itemsQr' : 'inv.itemsOcr');
+      },
+
+      // 台灣發票啟發式解析：號碼（2 碼英文＋6~10 碼數字，不限定 8 碼）、
+      // 民國／西元日期、獨立 7~10 碼統編、關鍵字行最大金額。
+      // 抓錯可手改，不保證全對。
+      _parseInvoice(text) {
+        const out = { no: '', date: '', taxId: '', amount: '' };
+        if (!text) return out;
+        const lines = text.split('\n').map(s => s.trim()).filter(Boolean);
+        const flat = lines.join(' ');
+        const mNo = flat.match(/[A-Z]{2}\d{6,10}/);
+        if (mNo) out.no = mNo[0];
+        let mDate = flat.match(/(1[01]\d)[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})/);
+        if (mDate) {
+          out.date = `${parseInt(mDate[1], 10) + 1911}/${mDate[2].padStart(2, '0')}/${mDate[3].padStart(2, '0')}`;
+        } else {
+          mDate = flat.match(/(20\d{2})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+          if (mDate) out.date = `${mDate[1]}/${mDate[2].padStart(2, '0')}/${mDate[3].padStart(2, '0')}`;
+        }
+        let pool = flat;
+        if (out.no) pool = pool.split(out.no).join(' ');
+        pool = pool.replace(/\d{3,4}[\/\-.]\d{1,2}[\/\-.]\d{1,2}/g, m => ' '.repeat(m.length));
+        const mTax = pool.match(/(?:^|\D)(\d{7,10})(?:\D|$)/);
+        if (mTax) out.taxId = mTax[1];
+        if (out.taxId) pool = pool.split(out.taxId).join(' ');
+        const numOf = s => [...s.matchAll(/[\d,]+\.?\d*/g)]
+          .map(x => parseFloat(x[0].replace(/,/g, '')))
+          .filter(n => isFinite(n));
+        let best = 0;
+        for (const ln of lines) {
+          if (/總計|合計|總額|應付|應收|實收|現金|刷卡|小計|TOTAL|AMOUNT/i.test(ln)) {
+            for (const n of numOf(ln)) if (n > best) best = n;
+          }
+        }
+        if (!best) {
+          for (const n of numOf(pool)) if (n > best && n >= 10) best = n;
+        }
+        if (best) out.amount = String(Math.round(best)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        return out;
+      },
+
+      saveToNotes() {
+        const no = document.getElementById('invNo').value.trim();
+        const date = document.getElementById('invDate').value.trim();
+        const taxId = document.getElementById('invTaxId').value.trim();
+        const amount = document.getElementById('invAmount').value.trim();
+        if (!no && !date && !taxId && !amount) {
+          alert(t('inv.noData'));
+          return;
+        }
+        // 存進筆記的內容維持中文固定格式（產出物不翻譯）
+        let text = '🧾 發票';
+        if (date) text += ' ' + date;
+        if (no) text += '\n號碼：' + no;
+        if (taxId) text += '\n統編：' + taxId;
+        if (amount) text += '\n金額：' + amount;
+        // 明細一併存進同一張筆記（產出物維持中文固定格式）
+        if (this.items && this.items.length) {
+          text += '\n明細：';
+          for (const it of this.items) {
+            text += `\n・${it.name} x${it.qty} = ${this._fmtMoney(it.total)}`;
+          }
+        }
+        CardSandbox.add(text);
+        alert(t('inv.saved'));
+        MainNav.switchTo('cards');
+      },
+
+      clear() {
+        ['invNo', 'invDate', 'invTaxId', 'invAmount'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.value = '';
+        });
+        this.items = [];
+        this.itemsFromQr = false;
+        this._renderItems();
+        const raw = document.getElementById('invRawText');
+        if (raw) {
+          raw.textContent = '';
+          raw.classList.remove('show');
+        }
+        const preview = document.getElementById('invPreview');
+        if (preview) {
+          if (preview.src && preview.src.startsWith('blob:')) URL.revokeObjectURL(preview.src);
+          preview.removeAttribute('src');
+          preview.classList.remove('show');
+        }
+        const nameEl = document.getElementById('invFileName');
+        if (nameEl) nameEl.textContent = '';
+        this.imageBlob = null;
+        this._resetInputs();
+      },
+
+      _setProgress(show, text) {
+        const row = document.getElementById('invProgressRow');
+        const label = document.getElementById('invProgressText');
+        if (row) row.classList.toggle('show', !!show);
+        if (label && text) label.textContent = text;
+      },
+
+      _resetInputs() {
+        ['invFileInput', 'invCameraInput'].forEach(id => {
+          const input = document.getElementById(id);
+          if (input) input.value = '';
+        });
       }
     };
 
