@@ -1,4 +1,11 @@
 <!DOCTYPE html>
+<!--
+  語音轉文字小幫手（改作版）
+  原作：kenyuiyui / voice-to-text-line-bot-LIFF
+  https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF
+  原作採用 MIT License，Copyright (c) 2026 kenyuiyui，授權全文見本目錄 LICENSE。
+  本版在其基礎上改作（免 LINE 登入、地端 AI、發票、即時翻譯等），同樣以 MIT 授權釋出。
+-->
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
@@ -932,6 +939,12 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>即時翻譯改 6 秒一切段</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>即時翻譯切段從 15 秒縮短為 <b>6 秒</b>，反應更快；錄音分頁維持 15 秒不變</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>連線測試會分辨連不上還是跨域被擋</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>Ollama「測試連線」失敗時自動加測一次：伺服器有回應但跨域被擋會明確提示加 <code>OLLAMA_ORIGINS</code>；真的連不上會列出檢查清單（含區網 IP 需設 <code>OLLAMA_HOST=0.0.0.0</code>）</li>
@@ -1700,7 +1713,7 @@
         <div class="meeting-mode" id="liveMeetingCard">
           <div class="rec-orb" id="liveRecOrb">🌐</div>
           <div class="rec-status-text" id="liveStatusText" data-i18n="rec.notStarted">尚未開始</div>
-          <div class="rec-sub-text" id="liveSubText" data-i18n="live.clickToStart">按下開始錄音，每 15 秒顯示一段翻譯</div>
+          <div class="rec-sub-text" id="liveSubText" data-i18n="live.clickToStart">按下開始錄音，每 6 秒顯示一段翻譯</div>
           <div class="live-pane-label"><span data-i18n="live.pane1">上層</span> · <span id="livePane1Lang"></span></div>
           <div class="live-preview-list" id="liveTransList1">
             <div class="live-preview-empty" data-i18n="live.emptyBox">尚無譯文</div>
@@ -1905,7 +1918,8 @@
 
         <div class="settings-app-info">
           <span data-i18n="cfg.appName">行政小助手 · LIFF 相容版</span><br>
-          <span data-i18n="cfg.version">版本：</span><span id="settingsAppVersion"></span>
+          <span data-i18n="cfg.version">版本：</span><span id="settingsAppVersion"></span><br>
+          <span class="settings-origin" data-i18n="cfg.origin">改作自 kenyuiyui 開源專案（MIT）</span> · <a href="https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF" target="_blank" rel="noopener">GitHub</a>
         </div>
       </div>
     </main>
@@ -2202,6 +2216,7 @@
       'cfg.wipeAll': '🗑️ 刪除全部本機資料',
       'cfg.appName': '行政小助手 · LIFF 相容版',
       'cfg.version': '版本：',
+      'cfg.origin': '改作自 kenyuiyui 開源專案（MIT）',
       'act.sendToRoom': '📥 送回聊天室',
       'act.shareOut': '🔗 分享出去 ▾'
     });
@@ -2598,7 +2613,7 @@
       'live.needStt': '🔑 辨識服務尚未就緒（Groq 需 Key），點此前往設定',
       'live.needSum': '🔑 摘要服務尚未就緒（Gemini 需 Key），點此前往設定',
       'live.sttNote': '辨識語言共用「錄音」分頁的設定；翻譯走「摘要」分頁的服務設定。',
-      'live.clickToStart': '按下開始錄音，每 15 秒顯示一段翻譯',
+      'live.clickToStart': '按下開始錄音，每 6 秒顯示一段翻譯',
       'live.emptyBox': '尚無譯文',
       'live.copy': '📋 複製譯文全文',
       'live.recording': '錄音翻譯中，譯文會陸續出現。',
@@ -3722,7 +3737,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-csp-lan';
+    const APP_VERSION = '2026-09-live-6s';
 
     const IntroModal = {
       switchTab(tab) {
@@ -7597,7 +7612,7 @@
     };
 
     // ---------- 即時翻譯（錄音 → 轉寫 → 翻譯，每段即時顯示）----------
-    // 錄音流程跟錄音分頁相同（15 秒一切段、停止立即 flush 殘段），
+    // 錄音流程跟錄音分頁相同（6 秒一切段、停止立即 flush 殘段），
     // 差別在每段轉寫完再翻成目標語言才顯示，不寫入筆記。
     // STT 走辨識服務設定，翻譯走摘要服務設定，兩邊都要就緒。
     const LiveTransEngine = {
@@ -7606,7 +7621,7 @@
       stream: null,
       isRecording: false,
       segmentTimer: null,
-      SEGMENT_MS: 15000,
+      SEGMENT_MS: 6000,
       SILENCE_RMS_THRESHOLD: 0.01,
       _pendingCount: 0,
       results: [],
