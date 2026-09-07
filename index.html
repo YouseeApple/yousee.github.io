@@ -431,18 +431,24 @@
     .mode-switch button { flex: 1; padding: 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: var(--card-bg); border-radius: 8px; cursor: pointer; color: var(--ink-soft); }
     .mode-switch button.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-    /* 主導覽 7 分頁列，sticky 固定頂部，切分頁不需重新捲動（＋白版外部連結鈕） */
+    /* 主導覽 7 分頁列，sticky 固定頂部，切分頁不需重新捲動（＋白版外部連結鈕）。
+       橫向可滑動：按鈕保底寬度不被擠扁，分頁再多也只會往右滑、不會
+       換行或消失；捲軸隱藏保持乾淨。 */
     .main-tabs {
       display: flex; position: sticky; top: 0; z-index: 9;
       background: var(--card-bg); border-bottom: 1px solid var(--border);
+      overflow-x: auto; overflow-y: hidden;
+      scrollbar-width: none; -ms-overflow-style: none;
+      -webkit-overflow-scrolling: touch;
     }
+    .main-tabs::-webkit-scrollbar { display: none; }
     .main-tabs button {
-      flex: 1; padding: 10px 2px 8px; border: none; background: none; cursor: pointer;
+      flex: 1 0 auto; min-width: 64px; padding: 10px 2px 8px; border: none; background: none; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; gap: 2px;
       color: var(--ink-faint); border-bottom: 2px solid transparent;
     }
     .main-tabs button .tab-icon { font-size: 17px; line-height: 1; }
-    .main-tabs button .tab-label { font-size: 10px; font-weight: 600; line-height: 1; }
+    .main-tabs button .tab-label { font-size: 10px; font-weight: 600; line-height: 1; white-space: nowrap; }
     .main-tabs button.active { color: var(--line-green-dark); border-bottom-color: var(--line-green); }
     /* 摘要／共享分頁在有內容時顯示小紅點提醒（例如摘要池已有勾選但
        還沒點開摘要分頁查看），純粹是視覺提示，不影響功能 */
@@ -1279,7 +1285,7 @@
 
     <!-- 主導覽 Tab 列：🎙️錄音／🗂️筆記／📖共享／📝摘要／📄翻譯／⚙️設定，
          同一時間只顯示一個分頁內容 -->
-    <div class="main-tabs">
+    <div class="main-tabs" id="mainTabs">
       <button id="navTabRecord" class="active" onclick="MainNav.switchTo('record')">
         <span class="tab-icon">🎙️</span><span class="tab-label" data-i18n="nav.record">錄音</span>
       </button>
@@ -4237,6 +4243,18 @@
           if (btn) btn.classList.toggle('active', t === tab);
           if (panel) panel.classList.toggle('hidden', t !== tab);
         });
+
+        // 橫向捲動時把作用中的分頁捲進可視範圍（只動橫軸，不影響頁面上下捲動）
+        try {
+          const bar = document.getElementById('mainTabs');
+          const activeBtn = document.getElementById('navTab' + this._capitalize(tab));
+          if (bar && activeBtn) {
+            bar.scrollTo({
+              left: activeBtn.offsetLeft - bar.clientWidth / 2 + activeBtn.clientWidth / 2,
+              behavior: 'smooth'
+            });
+          }
+        } catch (e) {}
 
         document.getElementById('actionBar').style.display = (tab === 'cards') ? 'block' : 'none';
 
