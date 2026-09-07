@@ -1,9 +1,9 @@
 
 ## 來源與致謝 / Credits
 
-本專案改作自 [kenyuiyui / voice-to-text-line-bot-LIFF](https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF)，感謝原作者以 MIT 授權開放原始碼。本地改作包含：免 LINE 登入、地端 AI（Ollama／Faster-Whisper）、發票辨識、即時翻譯等，改作部分同樣以 MIT 授權釋出。
+本專案改作自 [kenyuiyui / voice-to-text-line-bot-LIFF](https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF)，感謝原作者以 MIT 授權開放原始碼。本地改作包含：免 LINE 登入、地端 AI（Ollama／Faster-Whisper）、發票辨識、即時翻譯等，改作部分同樣以 MIT 授權釋出。白板功能引用 [liqincheng「經典小畫家白板」](https://ithelp.ithome.com.tw/articles/10407620)，一併致謝。
 
-This project is derived from [kenyuiyui / voice-to-text-line-bot-LIFF](https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF). Thanks to the original author for releasing it under the MIT License. Local modifications (no-LOGIN flow, local AI, invoice OCR, live translation, etc.) are released under the same license.
+This project is derived from [kenyuiyui / voice-to-text-line-bot-LIFF](https://github.com/kenyuiyui/voice-to-text-line-bot-LIFF). Thanks to the original author for releasing it under the MIT License. Local modifications (no-LOGIN flow, local AI, invoice OCR, live translation, etc.) are released under the same license. The whiteboard feature is adapted from [liqincheng's「經典小畫家白板」](https://ithelp.ithome.com.tw/articles/10407620) — thanks as well.
 
 ---
 
