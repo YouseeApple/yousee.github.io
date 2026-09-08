@@ -162,6 +162,7 @@
   "cfg.appName": "Voice Card Notes · LIFF-compatible",
   "cfg.version": "Version: ",
   "cfg.origin": "Adapted from kenyuiyui's open-source project (MIT)",
+  "cfg.apiLocked": "🔒 Managed by the server api.json — read-only on this device",
   "act.sendToRoom": "📥 Send to chat",
   "act.shareOut": "🔗 Share ▾",
   "m.tabNotice": "⚠️ Before you start",

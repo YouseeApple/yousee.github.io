@@ -488,6 +488,10 @@
       font-size: 11px; font-weight: 700; color: var(--ink-soft); margin: 18px 0 8px;
     }
     .settings-section-label:first-child { margin-top: 0; }
+    .api-lock-banner {
+      background: #fff8e1; border: 1px solid #f0d48a; color: #8a6d1a;
+      border-radius: 8px; padding: 8px 12px; margin: 8px 0; font-size: 13px;
+    }
     .settings-item-row {
       display: flex; align-items: center; justify-content: space-between;
       background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px;
@@ -940,6 +944,32 @@
         <div id="modalChangelogContent" style="display:none;">
           <div class="version-entry">
             <span class="version-tag">最新</span>
+            <h4>錄音／摘要頁瘦身＋辨識語言預設自動</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>錄音頁的辨識服務／模型列、摘要頁的摘要服務／模型列全部拿掉（設定頁已設定，這裡不再重複）；辨識語言預設改為「自動」</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>錄音／摘要頁的服務改唯讀顯示</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>兩頁的辨識／摘要服務下拉改為唯讀文字，只顯示設定頁選中的 AI，不在這裡選；要換改去設定頁一次搞定</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>設定頁整理：只顯示選中的 AI＋api.json 唯讀鎖</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>辨識／摘要設定區只顯示「目前使用」選中的那一塊，沒選到的自動隱藏，畫面清爽多了</li>
+              <li>伺服器有 api.json（管理員統一管理）時，兩區自動上鎖唯讀：切換鈕、Key、位址模型都不能改，「存到伺服器」同步禁用；無 api.json 自動解鎖</li>
+            </ul>
+          </div>
+          <div class="version-entry">
+            <h4>介面語言改登記制：丟 .json 自動載入</h4>
+            <ul style="padding-left:18px; margin:4px 0 0;">
+              <li>語言代號與名稱改放 <b>api.json 的 langs 表</b>：新增語言只要丟 <code>ja.json</code> 到同目錄＋langs 加一行，不用改程式；抓不到的語言按鈕自動隱藏</li>
+              <li>設定頁語言按鈕改動態生成，瀏覽器語言自動判斷改比對全表；舊的中文／英文設定無痛延續</li>
+            </ul>
+          </div>
+          <div class="version-entry">
             <h4>即時翻譯改 6 秒一切段</h4>
             <ul style="padding-left:18px; margin:4px 0 0;">
               <li>即時翻譯切段從 15 秒縮短為 <b>6 秒</b>，反應更快；錄音分頁維持 15 秒不變</li>
@@ -1376,33 +1406,10 @@
         </div>
 
         <div class="lang-select-row">
-          <label for="sttProviderSelect" class="lang-select-label" data-i18n="rec.sttProvider">🎙️ 辨識服務</label>
-          <select id="sttProviderSelect" onchange="AIProviderConfig.setSttProvider(this.value)">
-            <option value="groq" data-i18n="rec.prov.groq">☁️ Groq 雲端</option>
-            <option value="ollama" data-i18n="rec.prov.ollama">🖥️ 地端 Ollama</option>
-            <option value="fw" data-i18n="rec.prov.fw">🎯 地端 Faster-Whisper</option>
-          </select>
-        </div>
-        <div class="lang-select-row" id="sttFwModelRow" style="display:none;">
-          <label for="sttFwModelSelect" class="lang-select-label" data-i18n="rec.sttFwModel">🎯 FW 模型</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <select id="sttFwModelSelect" onchange="AIProviderConfig.setFwModel(this.value)" style="max-width:150px;"></select>
-            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshFwModels()" data-i18n-title="rec.refreshFw" title="重新讀取 Faster-Whisper 模型清單">🔄</button>
-          </div>
-        </div>
-        <div class="lang-select-row" id="sttOllamaModelRow" style="display:none;">
-          <label for="sttOllamaModelSelect" class="lang-select-label" data-i18n="rec.sttOllamaModel">🖥️ Ollama 轉寫模型</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <select id="sttOllamaModelSelect" onchange="AIProviderConfig.setSttModel(this.value)" style="max-width:150px;"></select>
-            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshModels('stt')" data-i18n-title="rec.refreshLocal" title="重新讀取本機模型清單">🔄</button>
-          </div>
-        </div>
-
-        <div class="lang-select-row">
           <label for="langSelect" class="lang-select-label" data-i18n="rec.lang">🌐 辨識語言</label>
           <select id="langSelect" onchange="LanguageManager.onUserSelect(this.value)">
-            <option value="auto" data-i18n="rec.lang.auto">自動（中英日韓德混雜）</option>
-            <option value="zh" selected data-i18n="rec.lang.zh">中文</option>
+            <option value="auto" selected data-i18n="rec.lang.auto">自動（中英日韓德混雜）</option>
+            <option value="zh" data-i18n="rec.lang.zh">中文</option>
             <option value="en" data-i18n="rec.lang.en">英文</option>
             <option value="ja" data-i18n="rec.lang.ja">日文</option>
             <option value="ko" data-i18n="rec.lang.ko">韓文</option>
@@ -1493,20 +1500,6 @@
         <!-- 摘要來源讀取 SelectionPool（卡片+共享筆記統一勾選池） -->
         <div class="key-missing-hint hidden" id="summaryKeyMissingHint" onclick="MainNav.switchTo('settings')" data-i18n="sum.keyMissing">
           🔑 尚未設定 AI 摘要服務，點此前往設定（選填功能）
-        </div>
-        <div class="lang-select-row">
-          <label for="summaryProviderSelect" class="lang-select-label" data-i18n="sum.provider">🧠 摘要服務</label>
-          <select id="summaryProviderSelect" onchange="AIProviderConfig.setSummaryProvider(this.value)">
-            <option value="gemini" data-i18n="sum.prov.gemini">☁️ Gemini 雲端</option>
-            <option value="ollama" data-i18n="sum.prov.ollama">🖥️ 地端 Ollama</option>
-          </select>
-        </div>
-        <div class="lang-select-row" id="summaryOllamaModelRow" style="display:none;">
-          <label for="summaryOllamaModelSelect" class="lang-select-label" data-i18n="sum.ollamaModel">🖥️ Ollama 摘要模型</label>
-          <div style="display:flex; gap:6px; align-items:center;">
-            <select id="summaryOllamaModelSelect" onchange="AIProviderConfig.setSummaryModel(this.value)" style="max-width:150px;"></select>
-            <button class="shared-notes-select-all-btn" onclick="AIProviderConfig.refreshModels('summary')" data-i18n-title="sum.refreshLocal" title="重新讀取本機模型清單">🔄</button>
-          </div>
         </div>
         <div class="summary-panel" id="summaryPanel">
           <div class="summary-pool-hint" id="summaryPoolHint" data-i18n="sum.poolHint">尚未勾選任何資料。到「共享」分頁勾選共享筆記項目，或在「筆記」分頁切到「✅ 勾選模式」勾選卡片，即可納入摘要來源。</div>
@@ -1734,12 +1727,10 @@
       <div id="navPanelSettings" class="nav-panel hidden">
         <div class="provider-switch-row">
           <span class="provider-switch-label" data-i18n="settings.uiLang">🌐 介面語言</span>
-          <div class="provider-switch-btns" id="uiLangBtns">
-            <button data-ui-lang="zh" onclick="I18N.setLang('zh')">繁體中文</button>
-            <button data-ui-lang="en" onclick="I18N.setLang('en')">English</button>
-          </div>
+          <div class="provider-switch-btns" id="uiLangBtns"><!-- 語言按鈕由 I18N.renderLangBtns() 依語言表動態生成 --></div>
         </div>
         <div class="settings-section-label" data-i18n="cfg.sttZone">🎙️ 語音辨識服務</div>
+        <div class="api-lock-banner" id="apiLockBannerStt" style="display:none;" data-i18n="cfg.apiLocked">🔒 由伺服器 api.json 統一管理，本機唯讀</div>
         <div class="provider-switch-row">
           <span class="provider-switch-label" data-i18n="cfg.inUse">目前使用：</span>
           <div class="provider-switch-btns" id="sttProviderBtns">
@@ -1749,7 +1740,7 @@
           </div>
         </div>
 
-        <div class="key-panel">
+        <div class="key-panel" data-stt-panel="groq">
           <div class="key-panel-label" data-i18n="cfg.groqTitle">Groq API Key（辨識服務選「Groq 雲端」時必填）</div>
           <div class="key-panel-desc" data-i18n="cfg.groqDesc">可以預先存好多把 Key，額度用完或某把被刪除失效時，不用重新輸入，直接切換到下一把即可。目前使用中的那把會用綠框標示，最多可存 12 把。若辨識服務切成「地端 Ollama」或「Faster-Whisper」，此處可留空。</div>
 
@@ -1787,7 +1778,7 @@
         </div>
 
         <div class="zone-panels">
-        <div class="key-panel">
+        <div class="key-panel" data-stt-panel="ollama">
           <div class="key-panel-label" data-i18n="cfg.ollamaSttTitle">🖥️ 地端 Ollama（辨識用，免 Key）</div>
           <div class="key-panel-desc" data-i18n="cfg.ollamaSttDesc">辨識服務切成「地端 Ollama」時使用，語音只會送到下面這個位址。預設 <code>http://127.0.0.1:11434</code>。若連不上，請確認：① <code>ollama serve</code> 已啟動；② 有允許跨域（例如 <code>OLLAMA_ORIGINS=*</code>）；③ 防火牆沒有擋掉 11434。</div>
           <div class="key-panel-label" style="margin-top:10px;" data-i18n="cfg.baseUrl">服務位址</div>
@@ -1808,7 +1799,7 @@
           <div class="keypool-count-hint" id="ollamaSttModelsHint"></div>
         </div>
 
-        <div class="key-panel">
+        <div class="key-panel" data-stt-panel="fw">
           <div class="key-panel-label" data-i18n="cfg.fwTitle">🎯 地端 Faster-Whisper（辨識用，免 Key）</div>
           <div class="key-panel-desc" data-i18n="cfg.fwDesc">辨識服務切成「Faster-Whisper」時使用，依序自動試三種端點：OpenAI 相容的 <code>/v1/audio/transcriptions</code> → 舊式 <code>/asr</code> → whisper.cpp 的 <code>/inference</code>（例：<code>whisper-server -m ggml-small.bin --port 8000</code>）。預設 <code>http://127.0.0.1:8000</code>。若連不上，請確認：① 服務已啟動；② 有開 CORS（瀏覽器直連需要，whisper.cpp 預設已有）；③ 防火牆沒有擋掉對應 port。</div>
           <div class="key-panel-label" style="margin-top:10px;" data-i18n="cfg.baseUrl">服務位址</div>
@@ -1827,6 +1818,7 @@
         </div>
 
         <div class="settings-section-label" data-i18n="cfg.sumZone">🧠 會議記錄摘要</div>
+        <div class="api-lock-banner" id="apiLockBannerSum" style="display:none;" data-i18n="cfg.apiLocked">🔒 由伺服器 api.json 統一管理，本機唯讀</div>
         <div class="provider-switch-row">
           <span class="provider-switch-label" data-i18n="cfg.inUse">目前使用：</span>
           <div class="provider-switch-btns" id="sumProviderBtns">
@@ -1835,7 +1827,7 @@
           </div>
         </div>
 
-        <div class="key-panel">
+        <div class="key-panel" data-sum-panel="gemini">
           <div class="key-panel-label" data-i18n="cfg.geminiTitle">Gemini API Key（摘要服務選「Gemini 雲端」時才需要）</div>
           <div class="key-panel-desc" data-i18n="cfg.geminiDesc">要使用「AI 摘要」功能且摘要服務選「Gemini 雲端」時才需要填寫。同樣可以預先存好多把 Key（最多 5 把），失效時直接切換即可。若摘要服務切成「地端 Ollama」，此處可留空。</div>
 
@@ -1873,7 +1865,7 @@
         </div>
 
         <div class="zone-panels">
-        <div class="key-panel">
+        <div class="key-panel" data-sum-panel="ollama">
           <div class="key-panel-label" data-i18n="cfg.ollamaSumTitle">🖥️ 地端 Ollama（摘要用，免 Key）</div>
           <div class="key-panel-desc" data-i18n="cfg.ollamaSumDesc">摘要服務切成「地端 Ollama」時使用，逐字稿只會送到下面這個位址（可跟辨識用不同台）。預設 <code>http://127.0.0.1:11434</code>。連不上請確認 <code>ollama serve</code> 已啟動＋有允許跨域（<code>OLLAMA_ORIGINS=*</code>）。</div>
           <div class="key-panel-label" style="margin-top:10px;" data-i18n="cfg.baseUrl">服務位址</div>
@@ -2045,7 +2037,8 @@
     // 用法：靜態 HTML 加 data-i18n="key"（placeholder 用 data-i18n-ph、
     // title 用 data-i18n-title）；JS 用 t('key') 或 t('key', {x: 1})。
     // 找不到 key 時退回中文，再退回 key 本身，不會炸掉畫面。
-    const STRINGS = { zh: {}, en: {} };
+    // 其他語言槽（STRINGS.en 等）由 I18N.loadLangDict() 按語言表自動建立。
+    const STRINGS = { zh: {} };
     Object.assign(STRINGS.zh, {
       'meta.title': '行政小助手-會議紀錄/翻譯/報帳',
       'nav.record': '錄音',
@@ -2218,6 +2211,7 @@
       'cfg.appName': '行政小助手 · LIFF 相容版',
       'cfg.version': '版本：',
       'cfg.origin': '改作自 kenyuiyui 開源專案（MIT）',
+      'cfg.apiLocked': '🔒 由伺服器 api.json 統一管理，本機唯讀',
       'act.sendToRoom': '📥 送回聊天室',
       'act.shareOut': '🔗 分享出去 ▾'
     });
@@ -2628,25 +2622,93 @@
     /*__I18N_DICT__*/
 
     const I18N = {
-      LANG_LABELS: { zh: '繁體中文', en: 'English' },
+      // 內建預設語言表（api.json 到達前／沒有 api.json 時的退路）。
+      // file:null = 內建免載；其餘開機自動抓同目錄 <file>，抓不到該按鈕自動隱藏。
+      // 新增語言：丟 <code>.json 到同目錄＋在 api.json 的 langs 加一行即可，不用改程式。
+      DEFAULT_LANGS: [
+        { code: 'zh', name: '繁體中文', file: null },
+        { code: 'en', name: 'English', file: 'en.json' }
+      ],
+      _langs: null,
       _lang: null,
-      // 英文字典外掛在 en.json：抓得到才有英文可用，抓不到就只有中文。
-      // 中文內建（STRINGS.zh），不另存檔案。
-      _enAvailable: false,
+      // code -> true(載入成功)。zh 永遠可用，不用記；
+      // 載入失敗記 false，切換器自動隱藏該語言。
+      _available: {},
+
+      getLangs() {
+        if (!this._langs) this._langs = this.DEFAULT_LANGS.map(e => ({ code: e.code, name: e.name, file: e.file || null }));
+        return this._langs;
+      },
+
+      getEntry(code) {
+        return this.getLangs().find(e => e.code === code) || null;
+      },
+
+      isAvailable(code) {
+        if (code === 'zh') return true;
+        return !!this._available[code];
+      },
+
+      // 舊名相容
+      isEnAvailable() { return this.isAvailable('en'); },
+
+      // api.json 到達時合併語言表：同 code 更新名稱／檔名、保持原順序；
+      // 新 code 接在後面。合併後自動載入新語言字典並重繪切換器。
+      async applyServerLangs(list) {
+        if (!Array.isArray(list)) return false;
+        const clean = [];
+        list.forEach(e => {
+          if (!e || typeof e.code !== 'string' || !e.code) return;
+          clean.push({
+            code: e.code,
+            name: (typeof e.name === 'string' && e.name) || e.code,
+            file: (typeof e.file === 'string' && e.file) || null
+          });
+        });
+        if (!clean.length || !clean.some(e => e.code === 'zh')) return false;
+        const cur = this.getLangs();
+        let changed = clean.length !== cur.length;
+        const merged = clean.map(e => {
+          const old = cur.find(o => o.code === e.code);
+          if (!old || old.name !== e.name || (old.file || null) !== e.file) changed = true;
+          return e;
+        });
+        if (!changed) {
+          // 表相同仍重試尚未載入的字典（檔案可能是管理者後來才上傳的）
+          const jobs = this.getLangs()
+            .filter(e => e.code !== 'zh' && e.file && !this._available[e.code])
+            .map(e => this.loadLangDict(e.code));
+          if (jobs.length) {
+            await Promise.all(jobs);
+            this.renderLangBtns();
+            this.applyStatic();
+          }
+          return false;
+        }
+        this._langs = merged;
+        // 目前語言被新表拿掉就退回中文
+        if (this._lang && !this.getEntry(this._lang)) this._lang = 'zh';
+        await this._loadAllDicts();
+        this.renderLangBtns();
+        this.applyStatic();
+        return true;
+      },
 
       getLang() {
-        if (this._lang === 'zh' || this._lang === 'en') return this._lang;
+        if (this._lang && this.getEntry(this._lang) && this.isAvailable(this._lang)) return this._lang;
         try {
           const saved = localStorage.getItem('ui_lang');
-          if (saved === 'zh' || saved === 'en') {
+          if (saved && this.getEntry(saved) && this.isAvailable(saved)) {
             this._lang = saved;
             return saved;
           }
         } catch (e) {}
-        // 首次進入：跟著瀏覽器語言，英文開頭用英文，其餘維持繁中
+        // 首次進入：瀏覽器語言前綴比對全表，有命中且可用才用，否則繁中
         try {
           const nav = (navigator.language || '').toLowerCase();
-          this._lang = nav.startsWith('en') ? 'en' : 'zh';
+          const hit = this.getLangs().find(e => e.code && nav.startsWith(String(e.code).toLowerCase()));
+          if (hit && this.isAvailable(hit.code)) this._lang = hit.code;
+          else this._lang = 'zh';
         } catch (e) {
           this._lang = 'zh';
         }
@@ -2654,34 +2716,69 @@
       },
 
       setLang(lang) {
-        if (lang !== 'zh' && lang !== 'en') return;
-        // 英文檔還沒載入（或根本沒有 en.json）就退回中文
-        if (lang === 'en' && !this.isEnAvailable()) lang = 'zh';
+        if (!this.getEntry(lang)) return;
+        if (!this.isAvailable(lang)) {
+          // 已知不可用（載入失敗）→ 退中文
+          if (this._available[lang] === false) lang = 'zh';
+          else {
+            // 尚未載入：先切過去（缺 key 退中文顯示），字典到了再重繪
+            this._lang = lang;
+            try { localStorage.setItem('ui_lang', lang); } catch (e) {}
+            this.applyAll();
+            this.loadLangDict(lang).then(ok => {
+              if (!ok && this._lang === lang) {
+                this._lang = 'zh';
+                try { localStorage.setItem('ui_lang', 'zh'); } catch (e) {}
+              }
+              this.renderLangBtns();
+              this.applyAll();
+            });
+            return;
+          }
+        }
         this._lang = lang;
         try { localStorage.setItem('ui_lang', lang); } catch (e) {}
         this.applyAll();
       },
 
-      isEnAvailable() { return !!this._enAvailable; },
-
-      // 開機時試著抓同目錄的 en.json；成功才解鎖英文選項。
-      // 回傳 I18N.ready，給需要等字典的流程用（如 api.json 自動套用）。
-      async loadEnDict() {
+      // 通用字典載入器：按語言表找檔，成功合併、失敗標記不可用（切換器自動隱藏）。
+      async loadLangDict(code) {
+        const entry = this.getEntry(code);
+        if (!entry || !entry.file) return code === 'zh';
         try {
-          const res = await fetch('en.json', { cache: 'no-store' });
+          const res = await fetch(entry.file, { cache: 'no-store' });
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const dict = await res.json();
           if (dict && typeof dict === 'object') {
-            Object.assign(STRINGS.en, dict);
-            this._enAvailable = true;
+            if (!STRINGS[code]) STRINGS[code] = {};
+            Object.assign(STRINGS[code], dict);
+            this._available[code] = true;
+            return true;
           }
+          throw new Error('bad dict');
         } catch (e) {
-          // 沒有 en.json 是正常情況（純中文部署），只給一行提示就好
-          console.warn('en.json 載入失敗，僅提供繁體中文：' + (e && e.message || e));
-          this._enAvailable = false;
+          // 缺檔／壞檔是正常情況（該語言尚未部署），隱藏選項，只給一行提示
+          console.warn(entry.file + ' 載入失敗，隱藏「' + (entry.name || code) + '」選項：' + (e && e.message || e));
+          this._available[code] = false;
+          return false;
         }
+      },
+
+      async _loadAllDicts() {
+        const jobs = this.getLangs()
+          .filter(e => e.code !== 'zh' && e.file && !this._available[e.code])
+          .map(e => this.loadLangDict(e.code));
+        if (jobs.length) await Promise.all(jobs);
+      },
+
+      // 開機：用內建表把全部登記語言載入（失敗自動隱藏），再套用目前語言。
+      // 回傳 I18N.ready，給需要等字典的流程用（如 api.json 自動套用）。
+      async boot() {
+        this.getLangs();
+        await this._loadAllDicts();
+        this.renderLangBtns();
         this.applyStatic();
-        return this._enAvailable;
+        return true;
       },
 
       t(key, vars) {
@@ -2711,18 +2808,30 @@
           el.setAttribute('title', this.t(el.getAttribute('data-i18n-title')));
         });
         document.title = this.t('meta.title');
-        try { document.documentElement.lang = lang === 'zh' ? 'zh-TW' : 'en'; } catch (e) {}
+        try { document.documentElement.lang = lang === 'zh' ? 'zh-TW' : lang; } catch (e) {}
         try {
           const og = document.querySelector('meta[property="og:locale"]');
-          if (og) og.setAttribute('content', lang === 'zh' ? 'zh_TW' : 'en_US');
+          if (og) og.setAttribute('content', lang === 'zh' ? 'zh_TW' : (lang === 'en' ? 'en_US' : lang));
         } catch (e) {}
-        document.querySelectorAll('#uiLangBtns button').forEach(b => {
-          b.classList.toggle('active', b.dataset.uiLang === lang);
-        });
-        // 沒有 en.json 就不顯示英文選項
+        this.renderLangBtns();
+      },
+
+      // 切換器按鈕依語言表動態生成：載入失敗的語言自動隱藏，只留可用的。
+      renderLangBtns() {
         try {
-          const enBtn = document.querySelector('#uiLangBtns button[data-ui-lang="en"]');
-          if (enBtn) enBtn.style.display = this.isEnAvailable() ? '' : 'none';
+          const box = document.getElementById('uiLangBtns');
+          if (!box) return;
+          const lang = this.getLang();
+          box.innerHTML = '';
+          this.getLangs().forEach(e => {
+            if (this._available[e.code] === false && e.code !== lang) return;
+            const b = document.createElement('button');
+            b.setAttribute('data-ui-lang', e.code);
+            b.textContent = e.name || e.code;
+            if (e.code === lang) b.classList.add('active');
+            b.addEventListener('click', () => this.setLang(e.code));
+            box.appendChild(b);
+          });
         } catch (e) {}
       },
 
@@ -2754,8 +2863,8 @@
 
     function t(key, vars) { return I18N.t(key, vars); }
 
-    // 開機即試著載入 en.json；各流程用 I18N.ready 等它（成功或失敗都會 resolve）
-    I18N.ready = I18N.loadEnDict();
+    // 開機即按語言表載入全部登記字典；各流程用 I18N.ready 等它（成功或失敗都會 resolve）
+    I18N.ready = I18N.boot();
 
     // ---------- AI 服務供應商設定（Groq/Gemini 雲端 vs 地端 Ollama）----------
     // STT（語音辨識）：'groq' | 'ollama'；摘要：'gemini' | 'ollama'。
@@ -2828,11 +2937,13 @@
       getFwModel() { return this._get(this.LS_FW_MODEL, this.DEFAULT_FW_MODEL); },
 
       setSttProvider(v) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         this._set(this.LS_STT_PROVIDER, this.STT_PROVIDERS.includes(v) ? v : 'groq');
         this.syncUI();
         if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
       },
       setSummaryProvider(v) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         this._set(this.LS_SUMMARY_PROVIDER, v === 'ollama' ? 'ollama' : 'gemini');
         this.syncUI();
         if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
@@ -2874,6 +2985,7 @@
         return cleaned;
       },
       saveOllamaStt() {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         const baseEl = document.getElementById('ollamaSttBaseUrlInput');
         const sttEl = document.getElementById('ollamaSttModelInput');
         if (baseEl) this.setSttBaseUrl(baseEl.value);
@@ -2883,6 +2995,7 @@
         alert(t('cfg.savedStt'));
       },
       saveOllamaSum() {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         const baseEl = document.getElementById('ollamaSumBaseUrlInput');
         const sumEl = document.getElementById('ollamaSumModelInput');
         if (baseEl) this.setSumBaseUrl(baseEl.value);
@@ -2891,6 +3004,7 @@
         alert(t('cfg.savedSum'));
       },
       saveFw() {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         const baseEl = document.getElementById('fwBaseUrlInput');
         const modelEl = document.getElementById('fwModelInput');
         if (baseEl) this.setFwBaseUrl(baseEl.value);
@@ -3037,16 +3151,6 @@
       syncUI() {
         const sttP = this.getSttProvider();
         const sumP = this.getSummaryProvider();
-        const sttSel = document.getElementById('sttProviderSelect');
-        const sumSel = document.getElementById('summaryProviderSelect');
-        if (sttSel) sttSel.value = sttP;
-        if (sumSel) sumSel.value = sumP;
-        const sttOllamaRow = document.getElementById('sttOllamaModelRow');
-        const sttFwRow = document.getElementById('sttFwModelRow');
-        const sumRow = document.getElementById('summaryOllamaModelRow');
-        if (sttOllamaRow) sttOllamaRow.style.display = sttP === 'ollama' ? 'flex' : 'none';
-        if (sttFwRow) sttFwRow.style.display = sttP === 'fw' ? 'flex' : 'none';
-        if (sumRow) sumRow.style.display = sumP === 'ollama' ? 'flex' : 'none';
         document.querySelectorAll('#sttProviderBtns button').forEach(b => {
           b.classList.toggle('active', b.dataset.sttProvider === sttP);
         });
@@ -3063,10 +3167,21 @@
         fill('ollamaSumModelInput', this.getSummaryModel());
         fill('fwBaseUrlInput', this.getFwBaseUrl());
         fill('fwModelInput', this.getFwModel());
-        // 下拉若還沒填過模型清單，先用目前設定值佔位
-        this._fillModelSelect('sttOllamaModelSelect', [this.getSttModel()], this.getSttModel());
-        this._fillModelSelect('summaryOllamaModelSelect', [this.getSummaryModel()], this.getSummaryModel());
-        this._fillModelSelect('sttFwModelSelect', this.FW_MODEL_CHOICES, this.getFwModel());
+        this.refreshProviderPanels();
+        if (typeof ApiLock !== 'undefined') ApiLock.apply();
+      },
+
+      // 設定頁只顯示目前選中的供應商設定區，沒選到的隱藏，畫面才乾淨。
+      // 切換列本身永遠顯示，不然沒法切換。
+      refreshProviderPanels() {
+        const sttP = this.getSttProvider();
+        const sumP = this.getSummaryProvider();
+        document.querySelectorAll('[data-stt-panel]').forEach(p => {
+          p.style.display = p.dataset.sttPanel === sttP ? '' : 'none';
+        });
+        document.querySelectorAll('[data-sum-panel]').forEach(p => {
+          p.style.display = p.dataset.sumPanel === sumP ? '' : 'none';
+        });
       }
     };
 
@@ -3555,6 +3670,49 @@
     // JSON PUT 到同目錄的 api.json；「載入」則讀回來套用。
     // 注意：純靜態主機收不到 PUT／POST，save() 會失敗並提示改用下載
     // 後手動上傳；api.json 內容公開可讀，只適合信任的內網。
+    // ---------- API 設定唯讀鎖 ----------
+    // 伺服器上有可用的 api.json（管理員統一管理）時，鎖住「🎙️語音辨識服務」
+    // 與「🧠會議記錄摘要」兩區：切換鈕＋所有輸入／按鈕＋存到伺服器全部 disabled。
+    // 語言、共用載入／下載、資料管理、危險區不受影響。無 api.json 自動解鎖。
+    const ApiLock = {
+      _locked: false,
+
+      isLocked() { return this._locked; },
+
+      setLocked(on) {
+        on = !!on;
+        if (this._locked === on) { this._renderBanner(); return; }
+        this._locked = on;
+        this.apply();
+      },
+
+      apply() {
+        const on = this._locked;
+        try {
+          document.querySelectorAll('#sttProviderBtns button, #sumProviderBtns button').forEach(b => { b.disabled = on; });
+          document.querySelectorAll('[data-stt-panel] input, [data-stt-panel] button, [data-sum-panel] input, [data-sum-panel] button').forEach(el => { el.disabled = on; });
+          // 存到伺服器會蓋掉管理員的檔，鎖定時一併禁用；載入／下載無害，照常可用
+          document.querySelectorAll('.btn-sync-save').forEach(b => { b.disabled = on; });
+          this._renderBanner();
+          // KeyPool 清單是動態重建的，重畫一次讓刪除鈕／radio 跟上鎖定態
+          if (typeof KeyPoolPanel !== 'undefined') {
+            KeyPoolPanel.render('groq');
+            KeyPoolPanel.render('gemini');
+          }
+        } catch (e) {}
+      },
+
+      _renderBanner() {
+        try {
+          const show = this._locked ? '' : 'none';
+          const stt = document.getElementById('apiLockBannerStt');
+          const sum = document.getElementById('apiLockBannerSum');
+          if (stt) stt.style.display = show;
+          if (sum) sum.style.display = show;
+        } catch (e) {}
+      }
+    };
+
     const ServerKeySync = {
       FILE: 'api.json',
 
@@ -3567,6 +3725,7 @@
           updatedAt: new Date().toISOString(),
           app: 'voice-card-notes',
           uiLang: I18N.getLang(),
+          langs: I18N.getLangs(),
           groq: KeyPoolManager.exportPool('groq'),
           gemini: KeyPoolManager.exportPool('gemini'),
           sttProvider: AIProviderConfig.getSttProvider(),
@@ -3584,7 +3743,7 @@
           poolData.keys.some(k => k && typeof k.value === 'string' && k.value.trim()));
       },
 
-      applyDoc(doc) {
+      async applyDoc(doc) {
         if (!doc || typeof doc !== 'object') throw new Error(t('sync.err.format'));
         const skipped = [];
         let appliedKeys = 0;
@@ -3602,9 +3761,14 @@
         }
         let appliedSettings = false;
         const touchSettings = () => { appliedSettings = true; };
-        // 介面語言也共用：只有 en.json 到位才切英文，否則退回中文
-        if (doc.uiLang === 'en' && I18N.isEnAvailable()) { I18N.setLang('en'); touchSettings(); }
-        else if (doc.uiLang === 'zh') { I18N.setLang('zh'); touchSettings(); }
+        // 語言表與介面語言共用：先合併 langs（新語言字典自動載入），
+        // 再套用 uiLang；在表內且可用才切，否則退回中文
+        if (Array.isArray(doc.langs)) {
+          try { await I18N.applyServerLangs(doc.langs); touchSettings(); }
+          catch (e) { console.warn('套用伺服器語言表失敗：' + (e && e.message || e)); }
+        }
+        if (doc.uiLang && I18N.getEntry(doc.uiLang) && I18N.isAvailable(doc.uiLang)) { I18N.setLang(doc.uiLang); touchSettings(); }
+        else if (doc.uiLang) { I18N.setLang('zh'); touchSettings(); }
         if (doc.sttProvider) { AIProviderConfig.setSttProvider(doc.sttProvider); touchSettings(); }
         if (doc.summaryProvider) { AIProviderConfig.setSummaryProvider(doc.summaryProvider); touchSettings(); }
         if (doc.ollamaStt) {
@@ -3629,6 +3793,15 @@
         return { appliedKeys, skipped };
       },
 
+      // 該文件是否值得鎖定：有可用 Key 池或明確的服務設定才算；
+      // 空檔／壞檔不鎖，避免壞檔把使用者鎖死在本機改不了
+      _docUsable(doc) {
+        return !!(doc && typeof doc === 'object' &&
+          (this._hasUsableKeys(doc.groq) || this._hasUsableKeys(doc.gemini) ||
+           doc.sttProvider || doc.summaryProvider ||
+           doc.ollamaStt || doc.ollamaSum || doc.fasterWhisper));
+      },
+
       // 進設定頁／進站時呼叫。先等 en.json（字典會影響語言套用），
       // 若發現 api.json 存在就自動讀取套用、覆蓋本機設定（每頁只做一次）。
       // 之後再進設定頁只顯示狀態，不重複覆蓋。
@@ -3640,6 +3813,7 @@
           const res = await fetch(this.FILE, { cache: 'no-store' });
           if (!res.ok) {
             this._setHint(t('sync.check.noFile'));
+            if (typeof ApiLock !== 'undefined') ApiLock.setLocked(false);
             return false;
           }
           let doc = null;
@@ -3647,22 +3821,26 @@
           if (!this._autoApplied) {
             this._autoApplied = true;
             try {
-              const result = this.applyDoc(doc);
+              const result = await this.applyDoc(doc);
               const skipNote = result.skipped.length ? t('sync.load.skippedIntro') + result.skipped.join('\n- ') : '';
               this._setHint(t('sync.load.done') + (result.skipped.length ? t('sync.load.doneSkip', { n: result.skipped.length }) : ''));
               console.log('已自動套用伺服器 api.json' + skipNote);
+              if (typeof ApiLock !== 'undefined') ApiLock.setLocked(this._docUsable(doc));
               return true;
             } catch (err) {
               console.error('自動套用 api.json 失敗：', err);
               this._setHint(t('sync.load.fail', { err: err.message }));
+              if (typeof ApiLock !== 'undefined') ApiLock.setLocked(false);
               return false;
             }
           }
           const when = doc && doc.updatedAt ? `（更新於 ${String(doc.updatedAt).slice(0, 16).replace('T', ' ')}）` : '';
           this._setHint(t('sync.check.hasFile', { when }));
+          if (typeof ApiLock !== 'undefined') ApiLock.setLocked(this._docUsable(doc));
           return true;
         } catch (e) {
           this._setHint(t('sync.check.fail'));
+          if (typeof ApiLock !== 'undefined') ApiLock.setLocked(false);
           return false;
         }
       },
@@ -3677,18 +3855,22 @@
             this.check();
             return;
           }
-          const result = this.applyDoc(doc);
+          const result = await this.applyDoc(doc);
           const skipNote = result.skipped.length ? t('sync.load.skippedIntro') + result.skipped.join('\n- ') : '';
           this._setHint(t('sync.load.done') + (result.skipped.length ? t('sync.load.doneSkip', { n: result.skipped.length }) : ''));
+          if (typeof ApiLock !== 'undefined') ApiLock.setLocked(this._docUsable(doc));
           alert(t('sync.load.doneAlert') + skipNote);
         } catch (err) {
           console.error('載入 api.json 失敗：', err);
           this._setHint(t('sync.load.fail', { err: err.message }));
+          if (typeof ApiLock !== 'undefined') ApiLock.setLocked(false);
           alert(t('sync.load.failAlert', { err: err.message }));
         }
       },
 
       async save() {
+        // 鎖定時禁止存回，避免蓋掉管理員統一管理的檔
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) { alert(t('cfg.apiLocked')); return; }
         const doc = this.buildDoc();
         // 防呆：兩邊 Key 池都空的時候先問，避免存出別人載入會困惑的檔
         if (doc.groq.keys.length === 0 && doc.gemini.keys.length === 0) {
@@ -3738,7 +3920,7 @@
     // ---------- 首次進站提示彈窗 ----------
     // APP_VERSION 每次有值得使用者知道的重大變更時手動更新，
     // 版本號一變，之前勾選過「不用再提醒」的使用者會重新看到彈窗。
-    const APP_VERSION = '2026-09-live-6s';
+    const APP_VERSION = '2026-09-trim-tabs';
 
     const IntroModal = {
       switchTab(tab) {
@@ -4029,23 +4211,25 @@
           const isActive = k.id === activeId;
           const statusClass = k.status || 'ok';
           const statusLabel = t(this.STATUS_LABEL[statusClass] || this.STATUS_LABEL.ok);
+          // 鎖定時（伺服器 api.json 統一管理）整列唯讀
+          const locked = (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) ? 'disabled' : '';
           // 顯示遮蔽過的 key 片段（開頭 6 碼＋...＋末尾 4 碼），讓使用者
           // 能大致辨認是哪把、但不會整串明碼攤在畫面上被路過的人看到
           const masked = this._maskValue(k.value);
           return `
             <div class="keypool-item ${isActive ? 'active' : ''}" data-key-id="${k.id}">
               <input type="radio" class="keypool-item-radio" name="keypool-active-${type}"
-                     ${isActive ? 'checked' : ''}
+                     ${isActive ? 'checked' : ''} ${locked}
                       onchange="KeyPoolPanel.setActive('${type}', '${k.id}')"
                       title="${t('kp.setActiveTitle')}">
               <div class="keypool-item-main">
                 <input type="text" class="keypool-item-label" value="${Utils.escapeHtml(k.label)}"
                        onblur="KeyPoolPanel.renameKey('${type}', '${k.id}', this.value)"
-                       maxlength="20">
+                       maxlength="20" ${locked}>
                 <div class="keypool-item-value">${masked}</div>
               </div>
               <span class="keypool-item-status ${statusClass}">${statusLabel}</span>
-              <button class="keypool-item-del" onclick="KeyPoolPanel.removeKey('${type}', '${k.id}')" title="${t('kp.delTitle')}">✕</button>
+              <button class="keypool-item-del" onclick="KeyPoolPanel.removeKey('${type}', '${k.id}')" title="${t('kp.delTitle')}" ${locked}>✕</button>
             </div>
           `;
         }).join('');
@@ -4074,6 +4258,7 @@
       },
 
       addKey(type) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         const labelInput = document.getElementById(this.LABEL_INPUT_ID[type]);
         const valueInput = document.getElementById(this.VALUE_INPUT_ID[type]);
         if (!labelInput || !valueInput) return;
@@ -4096,6 +4281,7 @@
       },
 
       removeKey(type, id) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         if (!confirm(t('kp.confirmDel'))) return;
         KeyPoolManager.remove(type, id);
         this.render(type);
@@ -4103,6 +4289,7 @@
       },
 
       renameKey(type, id, newLabel) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) { this._renderList(type); return; }
         KeyPoolManager.rename(type, id, newLabel);
         // 只需要重畫清單本身（名稱可能被 rename 內部的空字串防呆
         // 規則還原成舊名稱），不需要整個 render，減少不必要的重繪
@@ -4110,12 +4297,14 @@
       },
 
       setActive(type, id) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) { this._renderList(type); return; }
         KeyPoolManager.setActive(type, id);
         this._renderList(type);
         if (typeof updateKeyMissingHints === 'function') updateKeyMissingHints();
       },
 
       setSwitchMode(type, mode) {
+        if (typeof ApiLock !== 'undefined' && ApiLock.isLocked()) return;
         KeyPoolManager.setSwitchMode(type, mode);
         this._renderSwitchModeButtons(type);
       },
@@ -7277,7 +7466,7 @@
       },
 
       AUTO_LOCK_MS: 60000,
-      selectedMode: 'zh',
+      selectedMode: 'auto',
       autoDetectedLang: null,
       autoLockExpiresAt: 0,
 
