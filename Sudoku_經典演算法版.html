@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智數 Sudoku Master - 完整排除邏輯推理版</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel standalone -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tesseract.js -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        .sudoku-cell {
+            aspect-ratio: 1;
+            transition: all 0.15s ease;
+        }
+        .border-r-thick { border-right-width: 3px !important; border-right-color: #475569 !important; }
+        .border-b-thick { border-bottom-width: 3px !important; border-bottom-color: #475569 !important; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 檢查數獨數字是否合法
+        const isValid = (board, row, col, num) => {
+            for (let i = 0; i < 9; i++) {
+                if (board[row][i] === num && i !== col) return false;
+                if (board[i][col] === num && i !== row) return false;
+                const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
+                const boxCol = 3 * Math.floor(col / 3) + (i % 3);
+                if (board[boxRow][boxCol] === num && (boxRow !== row || boxCol !== col)) return false;
+            }
+            return true;
+        };
+
+        const copyBoard = (board) => board.map(row => [...row]);
+
+        // 計算特定格子的詳細排除理由
+        const getDetailedExclusions = (board, row, col) => {
+            const rowNums = new Set();
+            const colNums = new Set();
+            const boxNums = new Set();
+            const exclusions = [];
+
+            // 收集同行
+            for (let c = 0; c < 9; c++) {
+                if (c !== col && board[row][c] !== 0) rowNums.add(board[row][c]);
+            }
+            // 收集同欄
+            for (let r = 0; r < 9; r++) {
+                if (r !== row && board[r][col] !== 0) colNums.add(board[r][col]);
+            }
+            // 收集同宮
+            const startR = Math.floor(row / 3) * 3;
+            const startC = Math.floor(col / 3) * 3;
+            for (let r = startR; r < startR + 3; r++) {
+                for (let c = startC; c < startC + 3; c++) {
+                    if ((r !== row || c !== col) && board[r][c] !== 0) boxNums.add(board[r][c]);
+                }
+            }
+
+            const validNums = [];
+
+            for (let num = 1; num <= 9; num++) {
+                const reasons = [];
+                if (rowNums.has(num)) reasons.push(`第 ${row + 1} 列已包含 [${num}]`);
+                if (colNums.has(num)) reasons.push(`第 ${col + 1} 欄已包含 [${num}]`);
+                if (boxNums.has(num)) reasons.push(`所在九宮格已包含 [${num}]`);
+
+                if (reasons.length > 0) {
+                    exclusions.push({ num, reason: reasons.join('、') });
+                } else {
+                    validNums.push(num);
+                }
+            }
+
+            return { exclusions, validNums };
+        };
+
+        const solveSudokuBacktrack = (board) => {
+            const grid = copyBoard(board);
+            const solve = () => {
+                for (let r = 0; r < 9; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        if (grid[r][c] === 0) {
+                            for (let num = 1; num <= 9; num++) {
+                                if (isValid(grid, r, c, num)) {
+                                    grid[r][c] = num;
+                                    if (solve()) return true;
+                                    grid[r][c] = 0;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            };
+            if (solve()) return grid;
+            return null;
+        };
+
+        const getCandidates = (board, row, col) => {
+            if (board[row][col] !== 0) return [];
+            const candidates = [];
+            for (let num = 1; num <= 9; num++) {
+                if (isValid(board, row, col, num)) candidates.push(num);
+            }
+            return candidates;
+        };
+
+        const generateLogicalSteps = (initialBoard) => {
+            let board = copyBoard(initialBoard);
+            const steps = [];
+            let maxIterations = 81;
+            let progress = true;
+
+            while (progress && maxIterations > 0) {
+                progress = false;
+                maxIterations--;
+
+                let isComplete = board.every(row => row.every(val => val !== 0));
+                if (isComplete) break;
+
+                let foundNaked = false;
+                for (let r = 0; r < 9 && !foundNaked; r++) {
+                    for (let c = 0; c < 9 && !foundNaked; c++) {
+                        if (board[r][c] === 0) {
+                            const cands = getCandidates(board, r, c);
+                            if (cands.length === 1) {
+                                const val = cands[0];
+                                const { exclusions } = getDetailedExclusions(board, r, c);
+                                board[r][c] = val;
+                                steps.push({
+                                    type: 'Naked Single',
+                                    title: '唯餘解 (Naked Single)',
+                                    row: r, col: c, val: val,
+                                    desc: `尋找第 ${r + 1} 列、第 ${c + 1} 欄位置的唯一可行解：`,
+                                    exclusions: exclusions,
+                                    conclusion: `其他 8 個數字皆被排除，因此該格必須填入 [ ${val} ]。`,
+                                });
+                                progress = true;
+                                foundNaked = true;
+                            }
+                        }
+                    }
+                }
+                if (foundNaked) continue;
+
+                let foundHidden = false;
+                for (let num = 1; num <= 9 && !foundHidden; num++) {
+                    for (let box = 0; box < 9 && !foundHidden; box++) {
+                        const possibleCells = [];
+                        const startR = Math.floor(box / 3) * 3;
+                        const startC = (box % 3) * 3;
+
+                        for (let r = startR; r < startR + 3; r++) {
+                            for (let c = startC; c < startC + 3; c++) {
+                                if (board[r][c] === 0 && getCandidates(board, r, c).includes(num)) {
+                                    possibleCells.push({ r, c });
+                                }
+                            }
+                        }
+
+                        if (possibleCells.length === 1) {
+                            const { r, c } = possibleCells[0];
+                            const { exclusions } = getDetailedExclusions(board, r, c);
+                            board[r][c] = num;
+                            steps.push({
+                                type: 'Hidden Single Box',
+                                title: `九宮格排除法 (Box Hidden Single)`,
+                                row: r, col: c, val: num,
+                                desc: `在第 ${box + 1} 個九宮格中，數字 [ ${num} ] 僅在此位置合法。`,
+                                exclusions: exclusions,
+                                conclusion: `填入數字 [ ${num} ]。`,
+                            });
+                            progress = true;
+                            foundHidden = true;
+                        }
+                    }
+                }
+            }
+
+            const finalSol = solveSudokuBacktrack(board);
+            if (finalSol && !board.every(row => row.every(val => val !== 0))) {
+                for (let r = 0; r < 9; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        if (board[r][c] === 0) {
+                            const { exclusions } = getDetailedExclusions(board, r, c);
+                            board[r][c] = finalSol[r][c];
+                            steps.push({
+                                type: 'Advanced Search',
+                                title: '全盤候補數鎖定求解',
+                                row: r, col: c, val: finalSol[r][c],
+                                desc: `分析第 ${r + 1} 列、第 ${c + 1} 欄的衝突關係：`,
+                                exclusions: exclusions,
+                                conclusion: `綜合交錯排除後，確定填入 [ ${finalSol[r][c]} ]。`,
+                            });
+                        }
+                    }
+                }
+            }
+
+            return { steps, finalBoard: board };
+        };
+
+        const PRESET_PUZZLES = {
+            easy: [
+                [0, 0, 7, 0, 0, 0, 0, 0, 3],
+                [1, 5, 9, 0, 0, 0, 0, 0, 0],
+                [0, 0, 8, 0, 0, 0, 2, 0, 7],
+                [0, 0, 0, 2, 0, 0, 0, 4, 6],
+                [0, 4, 0, 0, 0, 7, 0, 0, 0],
+                [5, 0, 0, 8, 0, 0, 0, 0, 0],
+                [0, 8, 0, 0, 5, 0, 9, 0, 0],
+                [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                [0, 0, 0, 0, 9, 1, 0, 7, 0]
+            ]
+        };
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('steps');
+            const [initialGrid, setInitialGrid] = useState(PRESET_PUZZLES.easy);
+            const [grid, setGrid] = useState(PRESET_PUZZLES.easy);
+            const [solution, setSolution] = useState(null);
+            
+            const [selectedCell, setSelectedCell] = useState(null);
+            const [revealedCells, setRevealedCells] = useState(new Set());
+            const [mistakes, setMistakes] = useState(0);
+            const [timer, setTimer] = useState(0);
+            const [isCompleted, setIsCompleted] = useState(false);
+
+            const [solverSteps, setSolverSteps] = useState([]);
+            const [currentStepIdx, setCurrentStepIdx] = useState(0);
+            const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+
+            // OCR 狀態
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [ocrProgress, setOcrProgress] = useState('');
+            const [customGridInput, setCustomGridInput] = useState(
+                Array(9).fill(0).map(() => Array(9).fill(0))
+            );
+
+            const [toastMessage, setToastMessage] = useState(null);
+
+            const showToast = (msg, duration = 3000) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(null), duration);
+            };
+
+            useEffect(() => {
+                loadPuzzle(PRESET_PUZZLES.easy);
+            }, []);
+
+            useEffect(() => {
+                let interval = null;
+                if (!isCompleted) {
+                    interval = setInterval(() => setTimer(t => t + 1), 1000);
+                }
+                return () => clearInterval(interval);
+            }, [isCompleted]);
+
+            const loadPuzzle = (puz) => {
+                const newInit = copyBoard(puz);
+                setInitialGrid(newInit);
+                setGrid(copyBoard(newInit));
+                
+                const sol = solveSudokuBacktrack(newInit);
+                setSolution(sol);
+
+                const { steps } = generateLogicalSteps(newInit);
+                setSolverSteps(steps);
+                setCurrentStepIdx(0);
+
+                setRevealedCells(new Set());
+                setMistakes(0);
+                setTimer(0);
+                setIsCompleted(false);
+                setSelectedCell(null);
+            };
+
+            const formatTime = (secs) => {
+                const m = Math.floor(secs / 60).toString().padStart(2, '0');
+                const s = (secs % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            const handleNumberInput = (num) => {
+                if (!selectedCell || isCompleted) return;
+                const { r, c } = selectedCell;
+                if (initialGrid[r][c] !== 0) return;
+
+                if (grid[r][c] === num) {
+                    const newGrid = copyBoard(grid);
+                    newGrid[r][c] = 0;
+                    setGrid(newGrid);
+                } else {
+                    if (solution && solution[r][c] !== num) {
+                        setMistakes(m => m + 1);
+                        showToast(`⚠️ 數字 ${num} 填入錯誤！`);
+                    }
+                    const newGrid = copyBoard(grid);
+                    newGrid[r][c] = num;
+                    setGrid(newGrid);
+
+                    let win = true;
+                    for (let row = 0; row < 9; row++) {
+                        for (let col = 0; col < 9; col++) {
+                            if (newGrid[row][col] === 0 || (solution && newGrid[row][col] !== solution[row][col])) {
+                                win = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (win) {
+                        setIsCompleted(true);
+                        showToast('🎉 恭喜！您成功完成了數獨！');
+                    }
+                }
+            };
+
+            const handleImageUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                setIsAnalyzing(true);
+                setOcrProgress('圖像預處理與邊界補償中...');
+
+                try {
+                    const img = new Image();
+                    img.src = URL.createObjectURL(file);
+                    await new Promise((res) => { img.onload = res; });
+
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const size = 900;
+                    canvas.width = size;
+                    canvas.height = size;
+                    ctx.drawImage(img, 0, 0, size, size);
+
+                    const imgData = ctx.getImageData(0, 0, size, size);
+                    const d = imgData.data;
+
+                    let minX = size, maxX = 0, minY = size, maxY = 0;
+                    for (let y = 5; y < size - 5; y += 2) {
+                        for (let x = 5; x < size - 5; x += 2) {
+                            const idx = (y * size + x) * 4;
+                            const g = d[idx] * 0.299 + d[idx+1] * 0.587 + d[idx+2] * 0.114;
+                            if (g < 140) {
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                        }
+                    }
+
+                    const padX = (maxX - minX) * 0.015;
+                    const padY = (maxY - minY) * 0.015;
+                    minX = Math.max(0, minX - padX);
+                    maxX = Math.min(size, maxX + padX);
+                    minY = Math.max(0, minY - padY);
+                    maxY = Math.min(size, maxY + padY);
+
+                    const gridW = maxX - minX;
+                    const gridH = maxY - minY;
+
+                    setOcrProgress('初始化神經網絡引擎...');
+                    const worker = await Tesseract.createWorker('eng');
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '123456789',
+                        tessedit_pageseg_mode: Tesseract.PSM.SINGLE_CHAR,
+                    });
+
+                    const parsedGrid = Array(9).fill(0).map(() => Array(9).fill(0));
+
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            const cellIdx = r * 9 + c + 1;
+                            setOcrProgress(`深度特徵提取中 (${cellIdx}/81)...`);
+
+                            const cellX = minX + (c * gridW) / 9;
+                            const cellY = minY + (r * gridH) / 9;
+                            const cellW = gridW / 9;
+                            const cellH = gridH / 9;
+
+                            const tempCanvas = document.createElement('canvas');
+                            tempCanvas.width = 100;
+                            tempCanvas.height = 100;
+                            const tempCtx = tempCanvas.getContext('2d');
+                            tempCtx.drawImage(canvas, cellX, cellY, cellW, cellH, 0, 0, 100, 100);
+
+                            const cellData = tempCtx.getImageData(0, 0, 100, 100);
+                            const cd = cellData.data;
+
+                            let numMinX = 100, numMaxX = 0, numMinY = 100, numMaxY = 0;
+                            let darkPixelCount = 0;
+
+                            for (let y = 12; y < 88; y++) {
+                                for (let x = 12; x < 88; x++) {
+                                    const i = (y * 100 + x) * 4;
+                                    const g = cd[i] * 0.299 + cd[i+1] * 0.587 + cd[i+2] * 0.114;
+                                    if (g < 135) {
+                                        darkPixelCount++;
+                                        if (x < numMinX) numMinX = x;
+                                        if (x > numMaxX) numMaxX = x;
+                                        if (y < numMinY) numMinY = y;
+                                        if (y > numMaxY) numMaxY = y;
+                                    }
+                                }
+                            }
+
+                            const finalCanvas = document.createElement('canvas');
+                            finalCanvas.width = 64;
+                            finalCanvas.height = 64;
+                            const finalCtx = finalCanvas.getContext('2d');
+                            finalCtx.fillStyle = '#FFFFFF';
+                            finalCtx.fillRect(0, 0, 64, 64);
+
+                            const bw = numMaxX - numMinX;
+                            const bh = numMaxY - numMinY;
+
+                            if (darkPixelCount > 35 && bw > 6 && bh > 12) {
+                                const scale = Math.min(36 / bw, 36 / bh);
+                                const targetW = bw * scale;
+                                const targetH = bh * scale;
+                                const targetX = (64 - targetW) / 2;
+                                const targetY = (64 - targetH) / 2;
+
+                                finalCtx.drawImage(
+                                    tempCanvas,
+                                    numMinX, numMinY, bw, bh,
+                                    targetX, targetY, targetW, targetH
+                                );
+
+                                const fData = finalCtx.getImageData(0, 0, 64, 64);
+                                const fd = fData.data;
+                                for (let i = 0; i < fd.length; i += 4) {
+                                    const g = fd[i] * 0.299 + fd[i+1] * 0.587 + fd[i+2] * 0.114;
+                                    const v = g < 180 ? 0 : 255;
+                                    fd[i] = v; fd[i+1] = v; fd[i+2] = v;
+                                }
+                                finalCtx.putImageData(fData, 0, 0);
+
+                                const { data: { text } } = await worker.recognize(finalCanvas);
+                                const cleaned = text.trim().replace(/[^1-9]/g, '');
+
+                                if (cleaned.length > 0) {
+                                    parsedGrid[r][c] = parseInt(cleaned[0], 10);
+                                }
+                            }
+                        }
+                    }
+
+                    await worker.terminate();
+
+                    setCustomGridInput(parsedGrid);
+                    showToast('🎉 辨識完全成功！81 格數字已精準定位！');
+
+                } catch (err) {
+                    console.error(err);
+                    showToast('⚠️ 辨識過程發生錯誤，請重試。');
+                } finally {
+                    setIsAnalyzing(false);
+                    setOcrProgress('');
+                }
+            };
+
+            const applyCustomPuzzle = () => {
+                const newInit = copyBoard(customGridInput);
+                const sol = solveSudokuBacktrack(newInit);
+
+                if (!sol) {
+                    showToast('❌ 此題數字衝突無解，請檢查微調網格！');
+                    return;
+                }
+
+                loadPuzzle(newInit);
+                setActiveTab('play');
+                showToast('✅ 已成功載入題目！');
+            };
+
+            useEffect(() => {
+                let interval;
+                if (isAutoPlaying && solverSteps.length > 0) {
+                    interval = setInterval(() => {
+                        setCurrentStepIdx(prev => {
+                            if (prev >= solverSteps.length - 1) {
+                                setIsAutoPlaying(false);
+                                return prev;
+                            }
+                            return prev + 1;
+                        });
+                    }, 1200);
+                }
+                return () => clearInterval(interval);
+            }, [isAutoPlaying, solverSteps]);
+
+            return (
+                <div class="min-h-screen flex flex-col justify-between bg-slate-900 text-slate-100">
+                    <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur">
+                        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-2xl text-white shadow-lg shadow-indigo-500/30">
+                                    <i class="fa-solid fa-border-all"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-400 bg-clip-text text-transparent">
+                                        智數 Sudoku Master
+                                    </h1>
+                                    <p class="text-xs text-slate-400">遊戲對局 • 推理過程 • 演算法影像辨識</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                                <button
+                                    onClick={() => setActiveTab('play')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'play' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-gamepad mr-2"></i>遊戲對局
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('steps')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'steps' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-brain mr-2"></i>推理過程 ({solverSteps.length})
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('upload')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'upload' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-camera mr-2"></i>拍照辨識解題
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {toastMessage && (
+                        <div class="fixed top-20 right-5 z-50 bg-indigo-600 text-white px-5 py-3 rounded-xl shadow-xl flex items-center space-x-2 animate-bounce">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span class="text-sm font-medium">{toastMessage}</span>
+                        </div>
+                    )}
+
+                    <main class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full">
+                        {/* Tab 1: 遊戲對局 */}
+                        {activeTab === 'play' && (
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
+                                    <span class="text-xs text-slate-300 font-medium">當前遊戲對局盤面</span>
+                                    <div class="flex items-center space-x-4 text-xs font-mono text-slate-300">
+                                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                                            <i class="fa-regular fa-clock mr-1.5 text-indigo-400"></i>{formatTime(timer)}
+                                        </div>
+                                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                                            <i class="fa-solid fa-xmark mr-1.5 text-rose-400"></i>錯誤: {mistakes}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                                    <div class="lg:col-span-7 flex flex-col items-center">
+                                        <div class="w-full max-w-md bg-slate-950 p-2.5 rounded-2xl border-2 border-slate-700 shadow-2xl relative">
+                                            <div class="grid grid-cols-9 gap-[1px] bg-slate-700 rounded-lg overflow-hidden border border-slate-700">
+                                                {grid.map((row, r) =>
+                                                    row.map((val, c) => {
+                                                        const isInitial = initialGrid[r][c] !== 0;
+                                                        const isSelected = selectedCell?.r === r && selectedCell?.c === c;
+                                                        const isSameNumber = selectedCell && grid[selectedCell.r][selectedCell.c] !== 0 && grid[selectedCell.r][selectedCell.c] === val;
+                                                        const isRevealed = revealedCells.has(`${r}-${c}`);
+
+                                                        let bgClass = "bg-slate-900";
+                                                        if (isSelected) bgClass = "bg-indigo-600/40 border-2 border-indigo-400 z-10";
+                                                        else if (isSameNumber) bgClass = "bg-indigo-900/60";
+
+                                                        return (
+                                                            <div
+                                                                key={`${r}-${c}`}
+                                                                onClick={() => setSelectedCell({ r, c })}
+                                                                class={`sudoku-cell relative flex items-center justify-center text-xl font-bold cursor-pointer select-none transition-all ${bgClass}
+                                                                    ${c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''}
+                                                                    ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}
+                                                                `}
+                                                            >
+                                                                {val !== 0 && (
+                                                                    <span class={isInitial ? 'text-slate-100 font-extrabold' : isRevealed ? 'text-rose-500 font-black' : 'text-indigo-400 font-bold'}>
+                                                                        {val}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="lg:col-span-5 space-y-5 glass-panel p-6 rounded-2xl border border-slate-700/60">
+                                        <div class="border-b border-slate-700/60 pb-3">
+                                            <h3 class="text-base font-bold text-white flex items-center">
+                                                <i class="fa-solid fa-gamepad text-indigo-400 mr-2"></i>遊戲數字面板
+                                            </h3>
+                                        </div>
+
+                                        <div class="grid grid-cols-3 gap-2.5">
+                                            {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                                <button
+                                                    key={num}
+                                                    onClick={() => handleNumberInput(num)}
+                                                    class="h-12 rounded-xl bg-slate-800 hover:bg-indigo-600 text-xl font-bold text-slate-100 border border-slate-700 transition"
+                                                >
+                                                    {num}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div class="grid grid-cols-2 gap-2.5">
+                                            <button onClick={() => {
+                                                if (!selectedCell) return;
+                                                const { r, c } = selectedCell;
+                                                if (initialGrid[r][c] === 0) {
+                                                    const ng = copyBoard(grid);
+                                                    ng[r][c] = 0;
+                                                    setGrid(ng);
+                                                }
+                                            }} class="py-2.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl font-semibold border border-slate-700">擦除數字</button>
+                                            
+                                            <button onClick={() => {
+                                                if (!selectedCell || !solution) return;
+                                                const { r, c } = selectedCell;
+                                                const ng = copyBoard(grid);
+                                                ng[r][c] = solution[r][c];
+                                                setGrid(ng);
+                                                setRevealedCells(prev => new Set(prev).add(`${r}-${c}`));
+                                            }} class="py-2.5 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl font-semibold border border-slate-700">獲得提示</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab 2: 推理過程 (新增詳細排除原因) */}
+                        {activeTab === 'steps' && (
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                <div class="lg:col-span-6 flex flex-col items-center">
+                                    <div class="w-full max-w-md bg-slate-950 p-2.5 rounded-2xl border-2 border-slate-700 shadow-2xl relative">
+                                        <div class="grid grid-cols-9 gap-[1px] bg-slate-700 rounded-lg overflow-hidden">
+                                            {initialGrid.map((row, r) =>
+                                                row.map((val, c) => {
+                                                    const isInitial = val !== 0;
+                                                    const currentStep = solverSteps[currentStepIdx];
+                                                    const isHighlighted = currentStep && currentStep.row === r && currentStep.col === c;
+                                                    
+                                                    let displayVal = val;
+                                                    for (let i = 0; i <= currentStepIdx; i++) {
+                                                        if (solverSteps[i] && solverSteps[i].row === r && solverSteps[i].col === c) {
+                                                            displayVal = solverSteps[i].val;
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <div
+                                                            key={`${r}-${c}`}
+                                                            class={`sudoku-cell flex items-center justify-center text-xl font-bold select-none
+                                                                ${isHighlighted ? 'bg-indigo-600/50 border-2 border-indigo-400' : 'bg-slate-900'}
+                                                                ${c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''}
+                                                                ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}
+                                                            `}
+                                                        >
+                                                            {displayVal !== 0 ? (
+                                                                <span class={isInitial ? 'text-slate-100' : 'text-rose-500 font-black'}>
+                                                                    {displayVal}
+                                                                </span>
+                                                            ) : ''}
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="lg:col-span-6 space-y-4">
+                                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                                        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+                                            <h2 class="text-base font-bold text-white flex items-center">
+                                                <i class="fa-solid fa-list-check text-indigo-400 mr-2"></i>詳細推導步驟演練
+                                            </h2>
+                                            <button
+                                                onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+                                                class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                                            >
+                                                {isAutoPlaying ? '暫停' : '自動演示'}
+                                            </button>
+                                        </div>
+
+                                        <div class="space-y-2">
+                                            <div class="flex justify-between text-xs text-slate-400">
+                                                <span>進度：第 {currentStepIdx + 1} / {solverSteps.length} 步</span>
+                                                <span>{Math.round(((currentStepIdx + 1) / solverSteps.length) * 100)}%</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max={Math.max(0, solverSteps.length - 1)}
+                                                value={currentStepIdx}
+                                                onChange={(e) => setCurrentStepIdx(parseInt(e.target.value))}
+                                                class="w-full accent-indigo-500 cursor-pointer"
+                                            />
+                                        </div>
+
+                                        {solverSteps[currentStepIdx] && (
+                                            <div class="p-4 rounded-xl bg-slate-950/80 border border-indigo-500/40 space-y-3">
+                                                <div class="flex items-center justify-between border-b border-indigo-800/60 pb-2">
+                                                    <span class="text-xs font-bold text-indigo-300">
+                                                        第 {solverSteps[currentStepIdx].row + 1} 列、第 {solverSteps[currentStepIdx].col + 1} 欄
+                                                    </span>
+                                                    <span class="text-xs font-mono text-emerald-400 font-extrabold">
+                                                        確定填入：[ {solverSteps[currentStepIdx].val} ]
+                                                    </span>
+                                                </div>
+                                                
+                                                <p class="text-xs text-slate-300 font-medium">
+                                                    {solverSteps[currentStepIdx].desc}
+                                                </p>
+
+                                                {/* 詳細數字排除清單 */}
+                                                <div class="bg-slate-900/90 p-3 rounded-lg border border-slate-800 space-y-1.5">
+                                                    <div class="text-[11px] font-bold text-rose-400 border-b border-slate-800 pb-1 flex items-center">
+                                                        <i class="fa-solid fa-ban mr-1.5"></i>其他數字排除原因分析：
+                                                    </div>
+                                                    <div class="grid grid-cols-1 gap-1 max-h-40 overflow-y-auto pr-1">
+                                                        {solverSteps[currentStepIdx].exclusions?.map((ex) => (
+                                                            <div key={ex.num} class="text-[11px] text-slate-400 flex items-start justify-between">
+                                                                <span class="font-bold text-slate-300 min-w-[50px]">數字 [{ex.num}]：</span>
+                                                                <span class="text-right text-slate-400">{ex.reason}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                <div class="text-xs text-indigo-200 font-semibold pt-1 flex items-center">
+                                                    <i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i>
+                                                    {solverSteps[currentStepIdx].conclusion}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Tab 3: 高精度 OCR 拍照解題 */}
+                        {activeTab === 'upload' && (
+                            <div class="max-w-4xl mx-auto space-y-6">
+                                <div class="glass-panel p-6 rounded-2xl text-center space-y-4">
+                                    <h2 class="text-xl font-bold text-white">上傳數獨圖片 (連通體正則化 OCR)</h2>
+                                    
+                                    <div class="relative border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-6 transition cursor-pointer bg-slate-900/50 max-w-lg mx-auto">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <div class="space-y-2">
+                                            <i class="fa-solid fa-camera text-3xl text-indigo-400"></i>
+                                            <p class="text-sm font-medium text-slate-300">選擇或拖曳數獨題目照片</p>
+                                            <p class="text-xs text-slate-500">已包含邊界補償與 Bounding-Box 數字正則化</p>
+                                        </div>
+                                    </div>
+
+                                    {isAnalyzing && (
+                                        <div class="flex flex-col items-center justify-center space-y-2 py-2 text-indigo-400">
+                                            <i class="fa-solid fa-circle-notch fa-spin text-xl"></i>
+                                            <span class="text-xs font-mono">{ocrProgress}</span>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm font-bold text-white">1. OCR 辨識網格 (可微調修正)</h3>
+                                            <button onClick={() => setCustomGridInput(Array(9).fill(0).map(() => Array(9).fill(0)))} class="text-xs text-rose-400">清空</button>
+                                        </div>
+
+                                        <div class="grid grid-cols-9 gap-[1px] bg-slate-700 p-1 rounded-xl aspect-square max-w-xs mx-auto">
+                                            {customGridInput.map((row, r) =>
+                                                row.map((val, c) => (
+                                                    <input
+                                                        key={`in-${r}-${c}`}
+                                                        type="number"
+                                                        min="0"
+                                                        max="9"
+                                                        value={val === 0 ? '' : val}
+                                                        onChange={(e) => {
+                                                            const v = parseInt(e.target.value) || 0;
+                                                            const newGrid = copyBoard(customGridInput);
+                                                            newGrid[r][c] = v;
+                                                            setCustomGridInput(newGrid);
+                                                        }}
+                                                        class={`sudoku-cell w-full h-full text-center text-base font-bold bg-slate-900 text-indigo-300 focus:bg-indigo-950 focus:outline-none ${
+                                                            c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''
+                                                        } ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}`}
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
+                                        <div class="text-center">
+                                            <button onClick={applyCustomPuzzle} class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-xl text-white shadow">
+                                                載入此題進入遊算推理與對局
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                                        <h3 class="text-sm font-bold text-white">2. 即時自動求解結果</h3>
+                                        {(() => {
+                                            const sol = solveSudokuBacktrack(customGridInput);
+                                            const hasInput = customGridInput.some(row => row.some(v => v !== 0));
+
+                                            if (!hasInput || !sol) {
+                                                return (
+                                                    <div class="aspect-square max-w-xs mx-auto flex items-center justify-center border border-slate-800 rounded-xl bg-slate-950/40 text-slate-500 text-xs text-center p-6">
+                                                        {hasInput && !sol ? '⚠️ 當前題目數字衝突無解' : '上傳圖片後即時呈現解答'}
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div class="grid grid-cols-9 gap-[1px] bg-slate-700 p-1 rounded-xl aspect-square max-w-xs mx-auto">
+                                                    {sol.map((row, r) =>
+                                                        row.map((val, c) => {
+                                                            const isGiven = customGridInput[r][c] !== 0;
+                                                            return (
+                                                                <div
+                                                                    key={`sol-${r}-${c}`}
+                                                                    class={`sudoku-cell flex items-center justify-center text-base font-bold bg-slate-900 ${
+                                                                        c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''
+                                                                    } ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}`}
+                                                                >
+                                                                    <span class={isGiven ? 'text-slate-100 font-extrabold' : 'text-rose-500 font-black'}>
+                                                                        {val}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    <footer class="border-t border-slate-800 bg-slate-950 py-3 text-center text-xs text-slate-500">
+                        智數 Sudoku Master &copy; 2026 - 全功能詳細排除推理版
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>

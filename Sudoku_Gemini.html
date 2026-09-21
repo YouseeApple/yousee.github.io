@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智數 Sudoku Master - AI 智能數獨解題與遊玩平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- React & ReactDOM Standalone -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+        /* Custom Sudoku Grid styles */
+        .sudoku-cell {
+            aspect-ratio: 1;
+            transition: all 0.15s ease;
+        }
+        .border-r-thick { border-right-width: 3px !important; border-right-color: #475569 !important; }
+        .border-b-thick { border-bottom-width: 3px !important; border-bottom-color: #475569 !important; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // 檢查數獨數字是否合法
+        const isValid = (board, row, col, num) => {
+            for (let i = 0; i < 9; i++) {
+                if (board[row][i] === num && i !== col) return false;
+                if (board[i][col] === num && i !== row) return false;
+                const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
+                const boxCol = 3 * Math.floor(col / 3) + (i % 3);
+                if (board[boxRow][boxCol] === num && (boxRow !== row || boxCol !== col)) return false;
+            }
+            return true;
+        };
+
+        // 取得該格子其他數字無法填入的詳細排除原因
+        const getRejectionDetails = (board, row, col) => {
+            const rejections = [];
+            for (let num = 1; num <= 9; num++) {
+                if (board[row][col] !== 0) continue;
+                
+                // 檢查同行 (Row)
+                const rowConflictCol = board[row].findIndex((v, c) => c !== col && v === num);
+                if (rowConflictCol !== -1) {
+                    rejections.push({ num, reason: `第 ${row + 1} 列第 ${rowConflictCol + 1} 欄已有數字 [${num}]` });
+                    continue;
+                }
+                
+                // 檢查同欄 (Column)
+                let colConflictRow = -1;
+                for (let r = 0; r < 9; r++) {
+                    if (r !== row && board[r][col] === num) {
+                        colConflictRow = r;
+                        break;
+                    }
+                }
+                if (colConflictRow !== -1) {
+                    rejections.push({ num, reason: `第 ${colConflictRow + 1} 列第 ${col + 1} 欄已有數字 [${num}]` });
+                    continue;
+                }
+
+                // 檢查同宮 (Box)
+                const startR = Math.floor(row / 3) * 3;
+                const startC = Math.floor(col / 3) * 3;
+                let boxConflict = null;
+                for (let r = startR; r < startR + 3; r++) {
+                    for (let c = startC; c < startC + 3; c++) {
+                        if ((r !== row || c !== col) && board[r][c] === num) {
+                            boxConflict = { r, c };
+                            break;
+                        }
+                    }
+                }
+                if (boxConflict) {
+                    rejections.push({ num, reason: `所屬 3x3 九宮格 (第 ${boxConflict.r + 1} 列、第 ${boxConflict.c + 1} 欄) 已有數字 [${num}]` });
+                }
+            }
+            return rejections;
+        };
+
+        // 取得格子的所有候選數
+        const getCandidates = (board, row, col) => {
+            if (board[row][col] !== 0) return [];
+            const candidates = [];
+            for (let num = 1; num <= 9; num++) {
+                if (isValid(board, row, col, num)) {
+                    candidates.push(num);
+                }
+            }
+            return candidates;
+        };
+
+        // 深度複製盤面
+        const copyBoard = (board) => board.map(row => [...row]);
+
+        // 經典 Backtracking 解數獨
+        const solveSudokuBacktrack = (board) => {
+            const grid = copyBoard(board);
+            const solve = () => {
+                for (let r = 0; r < 9; r++) {
+                    for (let c = 0; c < 9; c++) {
+                        if (grid[r][c] === 0) {
+                            for (let num = 1; num <= 9; num++) {
+                                if (isValid(grid, r, c, num)) {
+                                    grid[r][c] = num;
+                                    if (solve()) return true;
+                                    grid[r][c] = 0;
+                                }
+                            }
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            };
+            if (solve()) return grid;
+            return null;
+        };
+
+        // 邏輯推理引擎：產生步驟與詳細排除說明 (參考台灣數獨協會與標準數獨規則)
+        const generateLogicalSteps = (initialBoard) => {
+            let board = copyBoard(initialBoard);
+            const steps = [];
+            let maxIterations = 81;
+            let progress = true;
+
+            while (progress && maxIterations > 0) {
+                progress = false;
+                maxIterations--;
+
+                let isComplete = board.every(row => row.every(val => val !== 0));
+                if (isComplete) break;
+
+                // 技巧 1: 唯餘解 (Naked Single / 唯一候選數)
+                let foundNaked = false;
+                for (let r = 0; r < 9 && !foundNaked; r++) {
+                    for (let c = 0; c < 9 && !foundNaked; c++) {
+                        if (board[r][c] === 0) {
+                            const cands = getCandidates(board, r, c);
+                            if (cands.length === 1) {
+                                const val = cands[0];
+                                const rejections = getRejectionDetails(board, r, c);
+                                board[r][c] = val;
+                                
+                                steps.push({
+                                    type: 'Naked Single',
+                                    title: '唯餘解 / 唯一候選數法 (Naked Single)',
+                                    row: r,
+                                    col: c,
+                                    val: val,
+                                    desc: `在第 ${r + 1} 列、第 ${c + 1} 欄的空格，根據數獨同行、同欄、同宮不可重複數字之規則進行排查：`,
+                                    rejections: rejections,
+                                    conclusion: `排除上述 8 個數字後，該格唯一能填入的合法數字僅剩 [ ${val} ]。`,
+                                    highlight: [{ r, c }]
+                                });
+                                progress = true;
+                                foundNaked = true;
+                            }
+                        }
+                    }
+                }
+                if (foundNaked) continue;
+
+                // 技巧 2: 隱性單數 (Hidden Single / 宮列欄排除法)
+                let foundHidden = false;
+                for (let num = 1; num <= 9 && !foundHidden; num++) {
+                    // 檢查 3x3 九宮格 (Box Elimination)
+                    for (let box = 0; box < 9 && !foundHidden; box++) {
+                        const possibleCells = [];
+                        const cellRejections = [];
+                        const startR = Math.floor(box / 3) * 3;
+                        const startC = (box % 3) * 3;
+
+                        for (let r = startR; r < startR + 3; r++) {
+                            for (let c = startC; c < startC + 3; c++) {
+                                if (board[r][c] === 0) {
+                                    if (getCandidates(board, r, c).includes(num)) {
+                                        possibleCells.push({ r, c });
+                                    } else {
+                                        // 找出該格為何無法填入 num
+                                        let reason = '';
+                                        if (board[r].includes(num)) reason = `同列(第 ${r + 1} 列)已包含數字 [${num}]`;
+                                        else if (board.some(row => row[c] === num)) reason = `同欄(第 ${c + 1} 欄)已包含數字 [${num}]`;
+                                        else reason = `與其他已知數字衝突`;
+                                        cellRejections.push({ cell: `第 ${r + 1} 列第 ${c + 1} 欄`, reason });
+                                    }
+                                }
+                            }
+                        }
+
+                        if (possibleCells.length === 1) {
+                            const { r, c } = possibleCells[0];
+                            board[r][c] = num;
+                            steps.push({
+                                type: 'Hidden Single Box',
+                                title: `九宮格排除法 (Box Hidden Single)`,
+                                row: r,
+                                col: c,
+                                val: num,
+                                desc: `在第 ${box + 1} 個 3x3 九宮格中排查數字 [ ${num} ] 的落點：`,
+                                candidateRejections: cellRejections,
+                                conclusion: `該宮內其他空格均因同行或同欄已有數字 [ ${num} ] 而遭到摒除，因此第 ${r + 1} 列第 ${c + 1} 欄為數字 [ ${num} ] 唯一的合法容身之處。`,
+                                highlight: [{ r, c }]
+                            });
+                            progress = true;
+                            foundHidden = true;
+                        }
+                    }
+
+                    if (foundHidden) break;
+
+                    // 檢查列 (Row Elimination)
+                    for (let r = 0; r < 9 && !foundHidden; r++) {
+                        const possibleCols = [];
+                        for (let c = 0; c < 9; c++) {
+                            if (board[r][c] === 0 && getCandidates(board, r, c).includes(num)) {
+                                possibleCols.push(c);
+                            }
+                        }
+                        if (possibleCols.length === 1) {
+                            const c = possibleCols[0];
+                            board[r][c] = num;
+                            steps.push({
+                                type: 'Hidden Single Row',
+                                title: `列排除法 (Row Hidden Single)`,
+                                row: r,
+                                col: c,
+                                val: num,
+                                desc: `觀察第 ${r + 1} 列中數字 [ ${num} ] 的位置：`,
+                                conclusion: `第 ${r + 1} 列的其他空格均受到同欄或同宮已有數字 [ ${num} ] 的交叉排除，故數字 [ ${num} ] 只能填入第 ${c + 1} 欄。`,
+                                highlight: [{ r, c }]
+                            });
+                            progress = true;
+                            foundHidden = true;
+                        }
+                    }
+
+                    if (foundHidden) break;
+
+                    // 檢查欄 (Column Elimination)
+                    for (let c = 0; c < 9 && !foundHidden; c++) {
+                        const possibleRows = [];
+                        for (let r = 0; r < 9; r++) {
+                            if (board[r][c] === 0 && getCandidates(board, r, c).includes(num)) {
+                                possibleRows.push(r);
+                            }
+                        }
+                        if (possibleRows.length === 1) {
+                            const r = possibleRows[0];
+                            board[r][c] = num;
+                            steps.push({
+                                type: 'Hidden Single Col',
+                                title: `欄排除法 (Column Hidden Single)`,
+                                row: r,
+                                col: c,
+                                val: num,
+                                desc: `觀察第 ${c + 1} 欄中數字 [ ${num} ] 的位置：`,
+                                conclusion: `第 ${c + 1} 欄的其他空格均受到同行或同宮已有數字 [ ${num} ] 的交叉排除，故數字 [ ${num} ] 只能填入第 ${r + 1} 列。`,
+                                highlight: [{ r, c }]
+                            });
+                            progress = true;
+                            foundHidden = true;
+                        }
+                    }
+                }
+            }
+
+            // 回溯補完
+            let completeCheck = board.every(row => row.every(val => val !== 0));
+            if (!completeCheck) {
+                const finalSol = solveSudokuBacktrack(board);
+                if (finalSol) {
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            if (board[r][c] === 0) {
+                                board[r][c] = finalSol[r][c];
+                                steps.push({
+                                    type: 'Advanced Search',
+                                    title: '進階邏輯/候選數深度檢索',
+                                    row: r,
+                                    col: c,
+                                    val: finalSol[r][c],
+                                    desc: `根據高階候選數區塊鎖定與矩陣聯立規則，推導出該格解答：`,
+                                    conclusion: `第 ${r + 1} 列、第 ${c + 1} 欄應填入數字 [ ${finalSol[r][c]} ]。`,
+                                    highlight: [{ r, c }]
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            return { steps, finalBoard: board };
+        };
+
+        const PRESET_PUZZLES = {
+            easy: [
+                [5, 3, 0, 0, 7, 0, 0, 0, 0],
+                [6, 0, 0, 1, 9, 5, 0, 0, 0],
+                [0, 9, 8, 0, 0, 0, 0, 6, 0],
+                [8, 0, 0, 0, 6, 0, 0, 0, 3],
+                [4, 0, 0, 8, 0, 3, 0, 0, 1],
+                [7, 0, 0, 0, 2, 0, 0, 0, 6],
+                [0, 6, 0, 0, 0, 0, 2, 8, 0],
+                [0, 0, 0, 4, 1, 9, 0, 0, 5],
+                [0, 0, 0, 0, 8, 0, 0, 7, 9]
+            ],
+            medium: [
+                [0, 0, 0, 2, 6, 0, 7, 0, 1],
+                [6, 8, 0, 0, 7, 0, 0, 9, 0],
+                [1, 9, 0, 0, 0, 4, 5, 0, 0],
+                [8, 2, 0, 1, 0, 0, 0, 4, 0],
+                [0, 0, 4, 6, 0, 2, 9, 0, 0],
+                [0, 5, 0, 0, 0, 3, 0, 2, 8],
+                [0, 0, 9, 3, 0, 0, 0, 7, 4],
+                [0, 4, 0, 0, 5, 0, 0, 3, 6],
+                [7, 0, 3, 0, 1, 8, 0, 0, 0]
+            ],
+            hard: [
+                [0, 2, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 6, 0, 0, 0, 0, 3],
+                [0, 7, 4, 0, 8, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 3, 0, 0, 2],
+                [0, 8, 0, 0, 4, 0, 0, 1, 0],
+                [6, 0, 0, 5, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 1, 0, 7, 8, 0],
+                [5, 0, 0, 0, 0, 9, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 4, 0]
+            ],
+            expert: [
+                [8, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 3, 6, 0, 0, 0, 0, 0],
+                [0, 7, 0, 0, 9, 0, 2, 0, 0],
+                [0, 5, 0, 0, 0, 7, 0, 0, 0],
+                [0, 0, 0, 0, 4, 5, 7, 0, 0],
+                [0, 0, 0, 1, 0, 0, 0, 3, 0],
+                [0, 0, 1, 0, 0, 0, 0, 6, 8],
+                [0, 0, 8, 5, 0, 0, 0, 1, 0],
+                [0, 9, 0, 0, 0, 0, 4, 0, 0]
+            ]
+        };
+
+        function App() {
+            // App Tab Mode: 'play' | 'upload' | 'steps'
+            const [activeTab, setActiveTab] = useState('play');
+            const [difficulty, setDifficulty] = useState('easy');
+            
+            // Boards
+            const [initialGrid, setInitialGrid] = useState(PRESET_PUZZLES.easy);
+            const [grid, setGrid] = useState(PRESET_PUZZLES.easy);
+            const [solution, setSolution] = useState(null);
+            
+            // Selection (Draft / Note Mode removed per request)
+            const [selectedCell, setSelectedCell] = useState(null);
+            
+            // Set of cell keys ('r-c') revealed by Hint/Solution in RED
+            const [revealedCells, setRevealedCells] = useState(new Set());
+            const hiddenInputRef = useRef(null);
+
+            // Game Info
+            const [mistakes, setMistakes] = useState(0);
+            const [timer, setTimer] = useState(0);
+            const [isPaused, setIsPaused] = useState(false);
+            const [isCompleted, setIsCompleted] = useState(false);
+
+            // Step-by-step reasoning state
+            const [solverSteps, setSolverSteps] = useState([]);
+            const [currentStepIdx, setCurrentStepIdx] = useState(0);
+            const [stepHighlight, setStepHighlight] = useState(null);
+            const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+
+            // Image AI Upload State
+            const [selectedImage, setSelectedImage] = useState(null);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [ocrError, setOcrError] = useState(null);
+            const [customGridInput, setCustomGridInput] = useState(
+                Array(9).fill(0).map(() => Array(9).fill(0))
+            );
+
+            // Toast / Notice Message
+            const [toastMessage, setToastMessage] = useState(null);
+
+            const showToast = (msg, duration = 3000) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(null), duration);
+            };
+
+            useEffect(() => {
+                loadPuzzle(difficulty);
+            }, [difficulty]);
+
+            useEffect(() => {
+                let interval = null;
+                if (!isPaused && !isCompleted) {
+                    interval = setInterval(() => setTimer(t => t + 1), 1000);
+                }
+                return () => clearInterval(interval);
+            }, [isPaused, isCompleted]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (activeTab !== 'play') return;
+
+                    if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName) && document.activeElement !== hiddenInputRef.current) {
+                        return;
+                    }
+
+                    if (e.key >= '1' && e.key <= '9') {
+                        handleNumberInput(parseInt(e.key, 10));
+                    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                        handleErase();
+                    } else if (e.key.toLowerCase() === 'h') {
+                        handleHint();
+                    } else if (selectedCell && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                        e.preventDefault();
+                        let { r, c } = selectedCell;
+                        if (e.key === 'ArrowUp') r = (r - 1 + 9) % 9;
+                        if (e.key === 'ArrowDown') r = (r + 1) % 9;
+                        if (e.key === 'ArrowLeft') c = (c - 1 + 9) % 9;
+                        if (e.key === 'ArrowRight') c = (c + 1) % 9;
+                        setSelectedCell({ r, c });
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [activeTab, selectedCell, grid, initialGrid, solution, isCompleted]);
+
+            const loadPuzzle = (diffKey) => {
+                const puzzle = PRESET_PUZZLES[diffKey] || PRESET_PUZZLES.easy;
+                const newInit = copyBoard(puzzle);
+                setInitialGrid(newInit);
+                setGrid(copyBoard(newInit));
+                
+                const sol = solveSudokuBacktrack(newInit);
+                setSolution(sol);
+
+                const { steps } = generateLogicalSteps(newInit);
+                setSolverSteps(steps);
+                setCurrentStepIdx(0);
+
+                setRevealedCells(new Set());
+                setMistakes(0);
+                setTimer(0);
+                setIsCompleted(false);
+                setSelectedCell(null);
+            };
+
+            const formatTime = (secs) => {
+                const m = Math.floor(secs / 60).toString().padStart(2, '0');
+                const s = (secs % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            const handleCellClick = (r, c) => {
+                setSelectedCell({ r, c });
+                if (hiddenInputRef.current) {
+                    hiddenInputRef.current.focus();
+                }
+            };
+
+            const handleNumberInput = (num) => {
+                if (!selectedCell || isCompleted) return;
+                const { r, c } = selectedCell;
+
+                if (initialGrid[r][c] !== 0) return;
+
+                const key = `${r}-${c}`;
+                if (revealedCells.has(key)) {
+                    const newRev = new Set(revealedCells);
+                    newRev.delete(key);
+                    setRevealedCells(newRev);
+                }
+
+                if (grid[r][c] === num) {
+                    const newGrid = copyBoard(grid);
+                    newGrid[r][c] = 0;
+                    setGrid(newGrid);
+                } else {
+                    if (solution && solution[r][c] !== num) {
+                        setMistakes(m => m + 1);
+                        showToast(`⚠️ 數字 ${num} 不正確喔！錯誤次數 +1`);
+                    }
+                    const newGrid = copyBoard(grid);
+                    newGrid[r][c] = num;
+                    setGrid(newGrid);
+
+                    let win = true;
+                    for (let row = 0; row < 9; row++) {
+                        for (let col = 0; col < 9; col++) {
+                            if (newGrid[row][col] === 0 || (solution && newGrid[row][col] !== solution[row][col])) {
+                                win = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (win) {
+                        setIsCompleted(true);
+                        showToast('🎉 恭喜！您成功完成了數獨！');
+                    }
+                }
+            };
+
+            const handleErase = () => {
+                if (!selectedCell || isCompleted) return;
+                const { r, c } = selectedCell;
+                if (initialGrid[r][c] !== 0) return;
+
+                const newGrid = copyBoard(grid);
+                newGrid[r][c] = 0;
+                setGrid(newGrid);
+
+                const key = `${r}-${c}`;
+                if (revealedCells.has(key)) {
+                    const newRev = new Set(revealedCells);
+                    newRev.delete(key);
+                    setRevealedCells(newRev);
+                }
+            };
+
+            const handleHint = () => {
+                if (!selectedCell) {
+                    showToast('💡 請先在左側點選要提示的空格');
+                    return;
+                }
+                const { r, c } = selectedCell;
+                if (grid[r][c] !== 0 && solution && grid[r][c] === solution[r][c]) return;
+
+                if (solution) {
+                    const correctVal = solution[r][c];
+                    const newGrid = copyBoard(grid);
+                    newGrid[r][c] = correctVal;
+                    setGrid(newGrid);
+
+                    const key = `${r}-${c}`;
+                    setRevealedCells(prev => new Set(prev).add(key));
+                    showToast(`💡 提示：填入數字 [ ${correctVal} ] （已以紅字標示）`);
+                }
+            };
+
+            const handleShowFullSolution = () => {
+                if (solution) {
+                    const newRevealed = new Set();
+                    for (let r = 0; r < 9; r++) {
+                        for (let c = 0; c < 9; c++) {
+                            if (initialGrid[r][c] === 0) {
+                                newRevealed.add(`${r}-${c}`);
+                            }
+                        }
+                    }
+                    setRevealedCells(newRevealed);
+                    setGrid(copyBoard(solution));
+                    setIsCompleted(true);
+                    showToast('✨ 已顯示完整解答！（答案數字均以紅字呈現）');
+                }
+            };
+
+            const handleImageUpload = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                    const base64Data = reader.result.split(',')[1];
+                    setSelectedImage(reader.result);
+                    setIsAnalyzing(true);
+                    setOcrError(null);
+
+                    try {
+                        const apiKey = "";
+                        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                        const payload = {
+                            contents: [{
+                                role: "user",
+                                parts: [
+                                    { text: "Analyze this image of a Sudoku puzzle. Read every cell row by row (9 rows, 9 columns). Return ONLY a JSON 2D array of numbers where empty cells are 0." },
+                                    { inlineData: { mimeType: file.type || "image/jpeg", data: base64Data } }
+                                ]
+                            }],
+                            generationConfig: {
+                                responseMimeType: "application/json",
+                                responseSchema: {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "ARRAY",
+                                        items: { type: "INTEGER" }
+                                    }
+                                }
+                            }
+                        };
+
+                        const res = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        const result = await res.json();
+                        const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        
+                        if (jsonText) {
+                            const parsedGrid = JSON.parse(jsonText);
+                            if (Array.isArray(parsedGrid) && parsedGrid.length === 9 && parsedGrid[0].length === 9) {
+                                setCustomGridInput(parsedGrid);
+                                showToast('🤖 AI 成功辨識圖片數獨！您可以確認或微調後開始解題。');
+                            } else {
+                                throw new Error('解析結果非標準 9x9 矩陣');
+                            }
+                        } else {
+                            throw new Error('無法識別圖片中的數獨網格');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        setOcrError('辨識失敗：請確保圖片清晰且包含完整的 9x9 數獨盤面，或直接在下方手動輸入。');
+                    } finally {
+                        setIsAnalyzing(false);
+                    }
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const applyCustomPuzzle = () => {
+                const newInit = copyBoard(customGridInput);
+                const sol = solveSudokuBacktrack(newInit);
+
+                if (!sol) {
+                    showToast('❌ 此題無效或無解，請檢查輸入的數字是否衝突！');
+                    return;
+                }
+
+                setInitialGrid(newInit);
+                setGrid(copyBoard(newInit));
+                setSolution(sol);
+
+                const { steps } = generateLogicalSteps(newInit);
+                setSolverSteps(steps);
+                setCurrentStepIdx(0);
+
+                setActiveTab('play');
+                showToast('✅ 已載入您的自訂題目！');
+            };
+
+            // Auto-play steps simulation
+            useEffect(() => {
+                let interval;
+                if (isAutoPlaying && solverSteps.length > 0) {
+                    interval = setInterval(() => {
+                        setCurrentStepIdx(prev => {
+                            if (prev >= solverSteps.length - 1) {
+                                setIsAutoPlaying(false);
+                                return prev;
+                            }
+                            return prev + 1;
+                        });
+                    }, 1500);
+                }
+                return () => clearInterval(interval);
+            }, [isAutoPlaying, solverSteps]);
+
+            // 同步當前步驟亮燈盤面
+            useEffect(() => {
+                if (activeTab === 'steps' && solverSteps[currentStepIdx]) {
+                    const step = solverSteps[currentStepIdx];
+                    setStepHighlight({ r: step.row, c: step.col, type: step.type });
+                } else {
+                    setStepHighlight(null);
+                }
+            }, [activeTab, currentStepIdx, solverSteps]);
+
+            return (
+                <div class="min-h-screen flex flex-col justify-between bg-slate-900 text-slate-100">
+                    {/* Header */}
+                    <header class="border-b border-slate-800 bg-slate-950/80 sticky top-0 z-50 backdrop-blur">
+                        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-2xl text-white shadow-lg shadow-indigo-500/30">
+                                    <i class="fa-solid fa-border-all"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-400 bg-clip-text text-transparent">
+                                        智數 Sudoku Master
+                                    </h1>
+                                    <p class="text-xs text-slate-400">遊玩 • 解題 • 邏輯推導 • AI 圖片識別</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+                                <button
+                                    onClick={() => setActiveTab('play')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'play' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-gamepad mr-2"></i>遊戲對局
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('steps')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'steps' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-brain mr-2"></i>推理過程 ({solverSteps.length})
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('upload')}
+                                    class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                                        activeTab === 'upload' ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    <i class="fa-solid fa-camera mr-2"></i>AI 拍照解題
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {toastMessage && (
+                        <div class="fixed top-20 right-5 z-50 bg-indigo-600 text-white px-5 py-3 rounded-xl shadow-xl flex items-center space-x-2 animate-bounce">
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span class="text-sm font-medium">{toastMessage}</span>
+                        </div>
+                    )}
+
+                    {/* Main Content */}
+                    <main class="max-w-6xl mx-auto px-4 py-6 flex-grow w-full">
+                        {activeTab === 'play' && (
+                            <div class="space-y-4">
+                                {/* Difficulty Selectors & Header Info */}
+                                <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-800/50 p-3 rounded-2xl border border-slate-700/50">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs text-slate-400 font-medium mr-1">難度選擇：</span>
+                                        {['easy', 'medium', 'hard', 'expert'].map((d) => (
+                                            <button
+                                                key={d}
+                                                onClick={() => setDifficulty(d)}
+                                                class={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition ${
+                                                    difficulty === d 
+                                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30' 
+                                                        : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
+                                                }`}
+                                            >
+                                                {{ easy: '簡單', medium: '普通', hard: '困難', expert: '專家' }[d]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div class="flex items-center space-x-4 text-xs font-mono text-slate-300">
+                                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                                            <i class="fa-regular fa-clock mr-1.5 text-indigo-400"></i>{formatTime(timer)}
+                                        </div>
+                                        <div class="bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                                            <i class="fa-solid fa-xmark mr-1.5 text-rose-400"></i>錯誤: {mistakes}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Side-by-Side Layout: Grid on Left, Controls & Keypad on Right */}
+                                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                                    {/* Left: Sudoku Grid */}
+                                    <div class="lg:col-span-7 flex flex-col items-center">
+                                        <div class="w-full max-w-md bg-slate-950 p-2.5 rounded-2xl border-2 border-slate-700 shadow-2xl relative">
+                                            <input
+                                                ref={hiddenInputRef}
+                                                type="text"
+                                                inputMode="numeric"
+                                                pattern="[1-9]*"
+                                                class="opacity-0 absolute w-0 h-0 pointer-events-none"
+                                                onKeyDown={(e) => {
+                                                    if (e.key >= '1' && e.key <= '9') {
+                                                        handleNumberInput(parseInt(e.key, 10));
+                                                    } else if (e.key === 'Backspace' || e.key === 'Delete') {
+                                                        handleErase();
+                                                    }
+                                                }}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/[^1-9]/g, '');
+                                                    if (val.length > 0) {
+                                                        const lastNum = parseInt(val[val.length - 1], 10);
+                                                        handleNumberInput(lastNum);
+                                                    }
+                                                    e.target.value = '';
+                                                }}
+                                            />
+
+                                            <div class="grid grid-cols-9 gap-[1px] bg-slate-700 rounded-lg overflow-hidden border border-slate-700">
+                                                {grid.map((row, r) =>
+                                                    row.map((val, c) => {
+                                                        const isInitial = initialGrid[r][c] !== 0;
+                                                        const isSelected = selectedCell?.r === r && selectedCell?.c === c;
+                                                        const isSameNumber = selectedCell && grid[selectedCell.r][selectedCell.c] !== 0 && grid[selectedCell.r][selectedCell.c] === val;
+                                                        const isRelated = selectedCell && (selectedCell.r === r || selectedCell.c === c || (Math.floor(selectedCell.r/3) === Math.floor(r/3) && Math.floor(selectedCell.c/3) === Math.floor(c/3)));
+                                                        const isError = val !== 0 && !isInitial && solution && solution[r][c] !== val;
+                                                        const isRevealed = revealedCells.has(`${r}-${c}`);
+
+                                                        let bgClass = "bg-slate-900";
+                                                        if (isSelected) bgClass = "bg-indigo-600/40 border-2 border-indigo-400 z-10";
+                                                        else if (isSameNumber) bgClass = "bg-indigo-900/60";
+                                                        else if (isRelated) bgClass = "bg-slate-800/80";
+
+                                                        return (
+                                                            <div
+                                                                key={`${r}-${c}`}
+                                                                onClick={() => handleCellClick(r, c)}
+                                                                class={`sudoku-cell relative flex items-center justify-center text-xl font-bold cursor-pointer select-none transition-all ${bgClass}
+                                                                    ${c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''}
+                                                                    ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}
+                                                                `}
+                                                            >
+                                                                {val !== 0 && (
+                                                                    <span class={`
+                                                                        ${isInitial ? 'text-slate-100 font-extrabold' : isRevealed ? 'text-rose-500 font-black drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 'text-indigo-400 font-bold'}
+                                                                        ${isError ? 'text-amber-400 animate-pulse' : ''}
+                                                                    `}>
+                                                                        {val}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Side Panel: Simplified Control Panel with Side Buttons */}
+                                    <div class="lg:col-span-5 space-y-5 glass-panel p-6 rounded-2xl border border-slate-700/60">
+                                        <div class="border-b border-slate-700/60 pb-3">
+                                            <h3 class="text-base font-bold text-white flex items-center">
+                                                <i class="fa-solid fa-gamepad text-indigo-400 mr-2"></i>數獨控制面板
+                                            </h3>
+                                            <p class="text-xs text-slate-400 mt-1">點選左側盤面空格後，由側面填入數字或請求提示</p>
+                                        </div>
+
+                                        {/* Keypad 1-9 Side Grid */}
+                                        <div>
+                                            <label class="block text-xs font-semibold text-slate-300 mb-2">數字填入 (1 - 9)</label>
+                                            <div class="grid grid-cols-3 gap-2.5">
+                                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                                    <button
+                                                        key={num}
+                                                        onClick={() => handleNumberInput(num)}
+                                                        class="h-12 rounded-xl bg-slate-800 hover:bg-indigo-600 active:scale-95 text-xl font-bold text-slate-100 shadow-md border border-slate-700/50 hover:border-indigo-400 transition flex items-center justify-center"
+                                                    >
+                                                        {num}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div class="space-y-2.5 pt-2">
+                                            <div class="grid grid-cols-2 gap-2.5">
+                                                <button
+                                                    onClick={handleErase}
+                                                    class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-semibold border border-slate-700 transition"
+                                                >
+                                                    <i class="fa-solid fa-eraser text-amber-400 mr-2 text-sm"></i>擦除數字
+                                                </button>
+                                                <button
+                                                    onClick={handleHint}
+                                                    class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 flex items-center justify-center text-xs font-semibold border border-slate-700 transition"
+                                                >
+                                                    <i class="fa-solid fa-lightbulb text-amber-400 mr-2 text-sm"></i>智慧提示
+                                                </button>
+                                            </div>
+
+                                            <button
+                                                onClick={handleShowFullSolution}
+                                                class="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white flex items-center justify-center text-xs font-bold shadow-lg shadow-indigo-600/30 border border-indigo-400/30 transition"
+                                            >
+                                                <i class="fa-solid fa-wand-magic-sparkles mr-2 text-sm"></i>一鍵顯示完整解答 (紅字標示)
+                                            </button>
+                                        </div>
+
+                                        {/* Keyboard Shortcut Info */}
+                                        <div class="pt-2 text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-800">
+                                            <span><i class="fa-solid fa-keyboard mr-1 text-indigo-400"></i>鍵盤：1-9, 方向鍵, H(提示)</span>
+                                            <button onClick={() => setActiveTab('steps')} class="text-indigo-400 font-semibold hover:underline">
+                                                看詳細推導 ({solverSteps.length}步)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'steps' && (
+                            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                                {/* Interactive Sudoku Board synced with Steps */}
+                                <div class="lg:col-span-6 flex flex-col items-center">
+                                    <div class="w-full max-w-md bg-slate-950 p-2.5 rounded-2xl border-2 border-slate-700 shadow-2xl relative">
+                                        <div class="grid grid-cols-9 gap-[1px] bg-slate-700 rounded-lg overflow-hidden border border-slate-700">
+                                            {initialGrid.map((row, r) =>
+                                                row.map((val, c) => {
+                                                    const isInitial = val !== 0;
+                                                    const currentStep = solverSteps[currentStepIdx];
+                                                    const isHighlighted = currentStep && currentStep.row === r && currentStep.col === c;
+                                                    
+                                                    let displayVal = val;
+                                                    for (let i = 0; i <= currentStepIdx; i++) {
+                                                        if (solverSteps[i] && solverSteps[i].row === r && solverSteps[i].col === c) {
+                                                            displayVal = solverSteps[i].val;
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <div
+                                                            key={`${r}-${c}`}
+                                                            class={`sudoku-cell relative flex items-center justify-center text-xl font-bold select-none transition-all
+                                                                ${isHighlighted ? 'bg-indigo-600/50 border-2 border-indigo-400 scale-105 z-20 shadow-lg shadow-indigo-500/50' : 'bg-slate-900'}
+                                                                ${c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''}
+                                                                ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}
+                                                            `}
+                                                        >
+                                                            {displayVal !== 0 ? (
+                                                                <span class={isInitial ? 'text-slate-100 font-black' : 'text-rose-500 font-extrabold drop-shadow-[0_0_6px_rgba(244,63,94,0.6)]'}>
+                                                                    {displayVal}
+                                                                </span>
+                                                            ) : ''}
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-3 flex items-center">
+                                        <span class="w-2.5 h-2.5 rounded-full bg-slate-100 inline-block mr-1.5"></span> 原始題目數字
+                                        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block ml-4 mr-1.5"></span> 邏輯推導填入數字（紅色）
+                                    </p>
+                                </div>
+
+                                {/* Detailed Logic Step Explanation Panel */}
+                                <div class="lg:col-span-6 space-y-4">
+                                    <div class="glass-panel p-5 rounded-2xl">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <div>
+                                                <h2 class="text-lg font-bold text-white">邏輯推導與數獨排除過程說明</h2>
+                                                <p class="text-xs text-slate-400">依據《台灣數獨協會》及國際標準數獨排查法則</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setIsAutoPlaying(!isAutoPlaying)}
+                                                class={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1.5 transition ${
+                                                    isAutoPlaying ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white'
+                                                }`}
+                                            >
+                                                <i class={`fa-solid ${isAutoPlaying ? 'fa-pause' : 'fa-play'}`}></i>
+                                                <span>{isAutoPlaying ? '暫停' : '自動演示'}</span>
+                                            </button>
+                                        </div>
+
+                                        {/* Step Slider Navigation */}
+                                        <div class="space-y-2 mb-5">
+                                            <div class="flex justify-between text-xs text-slate-300 font-mono">
+                                                <span>步驟 {currentStepIdx + 1} / {solverSteps.length}</span>
+                                                <span>{Math.round(((currentStepIdx + 1) / solverSteps.length) * 100)}% 完成度</span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max={Math.max(0, solverSteps.length - 1)}
+                                                value={currentStepIdx}
+                                                onChange={(e) => setCurrentStepIdx(parseInt(e.target.value))}
+                                                class="w-full accent-indigo-500 cursor-pointer"
+                                            />
+                                        </div>
+
+                                        {/* Detailed Reasoning Explanation Card */}
+                                        {solverSteps[currentStepIdx] && (
+                                            <div class="p-4 rounded-xl bg-indigo-950/80 border border-indigo-500/40 space-y-3 mb-5">
+                                                <div class="flex items-center justify-between border-b border-indigo-800/60 pb-2">
+                                                    <span class="text-xs font-bold text-indigo-300 bg-indigo-500/20 px-2.5 py-1 rounded-full border border-indigo-400/30">
+                                                        {solverSteps[currentStepIdx].title}
+                                                    </span>
+                                                    <span class="text-xs font-mono text-rose-400 font-extrabold">
+                                                        填入數字：[ {solverSteps[currentStepIdx].val} ]
+                                                    </span>
+                                                </div>
+                                                
+                                                <div class="text-xs text-indigo-200 font-semibold">
+                                                    📍 目標位置：第 {solverSteps[currentStepIdx].row + 1} 列、第 {solverSteps[currentStepIdx].col + 1} 欄
+                                                </div>
+
+                                                <p class="text-xs text-slate-300 leading-relaxed">
+                                                    {solverSteps[currentStepIdx].desc}
+                                                </p>
+
+                                                {/* Explicit list of rejected numbers for Naked Single */}
+                                                {solverSteps[currentStepIdx].rejections && (
+                                                    <div class="bg-slate-900/90 p-3 rounded-xl border border-indigo-500/20 text-xs space-y-1.5">
+                                                        <strong class="text-amber-400 block mb-1">🔍 其他數字為何無法填入此格？ (排除分析)：</strong>
+                                                        <div class="grid grid-cols-1 gap-1 text-[11px] text-slate-300">
+                                                            {solverSteps[currentStepIdx].rejections.map((rej, idx) => (
+                                                                <div key={idx} class="flex items-start space-x-1.5">
+                                                                    <span class="text-rose-400 font-bold shrink-0">✕ 數字 {rej.num}:</span>
+                                                                    <span class="text-slate-300">{rej.reason}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* Candidate Rejections for Box Elimination */}
+                                                {solverSteps[currentStepIdx].candidateRejections && (
+                                                    <div class="bg-slate-900/90 p-3 rounded-xl border border-indigo-500/20 text-xs space-y-1.5">
+                                                        <strong class="text-amber-400 block mb-1">🔍 該九宮格內其他空格為何不能填入數字 [{solverSteps[currentStepIdx].val}]？：</strong>
+                                                        <div class="grid grid-cols-1 gap-1 text-[11px] text-slate-300">
+                                                            {solverSteps[currentStepIdx].candidateRejections.map((rej, idx) => (
+                                                                <div key={idx} class="flex items-start space-x-1.5">
+                                                                    <span class="text-rose-400 font-bold shrink-0">✕ {rej.cell}:</span>
+                                                                    <span class="text-slate-300">{rej.reason}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div class="bg-indigo-900/40 p-2.5 rounded-lg border border-indigo-500/30 text-xs text-indigo-100 font-semibold flex items-center">
+                                                    <i class="fa-solid fa-circle-check text-emerald-400 mr-2 text-sm"></i>
+                                                    <span>{solverSteps[currentStepIdx].conclusion}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Full Step List */}
+                                        <div class="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                            {solverSteps.map((step, idx) => (
+                                                <div
+                                                    key={idx}
+                                                    onClick={() => setCurrentStepIdx(idx)}
+                                                    class={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                                                        currentStepIdx === idx 
+                                                            ? 'bg-indigo-600/30 border-indigo-500 text-white' 
+                                                            : 'bg-slate-800/40 border-slate-700/40 text-slate-400 hover:bg-slate-800'
+                                                    }`}
+                                                >
+                                                    <div class="flex items-center space-x-3">
+                                                        <span class={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+                                                            currentStepIdx === idx ? 'bg-indigo-500 text-white' : 'bg-slate-700 text-slate-300'
+                                                        }`}>
+                                                            {idx + 1}
+                                                        </span>
+                                                        <div>
+                                                            <div class="text-xs font-semibold text-slate-200">{step.title}</div>
+                                                            <div class="text-[11px] text-slate-400">位置 ({step.row + 1}, {step.col + 1}) → 填入 <span class="text-rose-400 font-bold">{step.val}</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <i class="fa-solid fa-chevron-right text-xs opacity-50"></i>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'upload' && (
+                            <div class="max-w-4xl mx-auto space-y-6">
+                                <div class="glass-panel p-6 rounded-2xl text-center space-y-4">
+                                    <div class="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto text-2xl border border-indigo-500/30">
+                                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-xl font-bold text-white">上傳數獨圖片 • 自動拍照解題</h2>
+                                        <p class="text-xs text-slate-300 mt-1">上傳圖片後 AI 將自動辨識並於本頁面直接展示完整解答</p>
+                                    </div>
+
+                                    {/* Upload Dropzone */}
+                                    <div class="relative border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-2xl p-6 transition cursor-pointer bg-slate-900/50 max-w-lg mx-auto">
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        />
+                                        <div class="space-y-2">
+                                            <i class="fa-solid fa-image text-3xl text-slate-500"></i>
+                                            <p class="text-sm font-medium text-slate-300">點擊或拖曳圖片至此處上傳</p>
+                                            <p class="text-xs text-slate-500">支援數獨題目照片、報紙或截圖</p>
+                                        </div>
+                                    </div>
+
+                                    {isAnalyzing && (
+                                        <div class="flex items-center justify-center space-x-3 py-3 text-indigo-400">
+                                            <i class="fa-solid fa-circle-notch fa-spin text-lg"></i>
+                                            <span class="text-sm font-semibold">Gemini AI 辨識盤面並計算解答中...</span>
+                                        </div>
+                                    )}
+
+                                    {ocrError && (
+                                        <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs max-w-lg mx-auto">
+                                            {ocrError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Instant Solution Display on the Upload Page */}
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                                    {/* Panel 1: Original / Recognized Grid */}
+                                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm font-bold text-white flex items-center">
+                                                <i class="fa-solid fa-pen-to-square text-indigo-400 mr-2"></i>1. 題目網格 (0 代表空白)
+                                            </h3>
+                                            <button
+                                                onClick={() => setCustomGridInput(Array(9).fill(0).map(() => Array(9).fill(0)))}
+                                                class="text-xs text-rose-400 hover:text-rose-300"
+                                            >
+                                                清空網格
+                                            </button>
+                                        </div>
+
+                                        <div class="grid grid-cols-9 gap-[1px] bg-slate-700 p-1 rounded-xl border border-slate-700 aspect-square max-w-xs mx-auto">
+                                            {customGridInput.map((row, r) =>
+                                                row.map((val, c) => (
+                                                    <input
+                                                        key={`${r}-${c}`}
+                                                        type="number"
+                                                        min="0"
+                                                        max="9"
+                                                        value={val === 0 ? '' : val}
+                                                        onChange={(e) => {
+                                                            const v = parseInt(e.target.value) || 0;
+                                                            if (v >= 0 && v <= 9) {
+                                                                const newGrid = copyBoard(customGridInput);
+                                                                newGrid[r][c] = v;
+                                                                setCustomGridInput(newGrid);
+                                                            }
+                                                        }}
+                                                        class={`sudoku-cell w-full h-full text-center text-base font-bold bg-slate-900 text-indigo-300 focus:bg-indigo-950 focus:outline-none transition ${
+                                                            c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''
+                                                        } ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}`}
+                                                        placeholder="."
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
+                                        <div class="text-center">
+                                            <button
+                                                onClick={applyCustomPuzzle}
+                                                class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-semibold border border-slate-700 transition"
+                                            >
+                                                <i class="fa-solid fa-gamepad mr-1.5"></i>載入此題進入對局遊玩
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Panel 2: Live Solution Grid on this page */}
+                                    <div class="glass-panel p-5 rounded-2xl space-y-4">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-sm font-bold text-white flex items-center">
+                                                <i class="fa-solid fa-wand-magic-sparkles text-rose-500 mr-2"></i>2. 本頁直接展示完整解答
+                                            </h3>
+                                            <span class="text-xs text-slate-400">紅色為解答數字</span>
+                                        </div>
+
+                                        {(() => {
+                                            const sol = solveSudokuBacktrack(customGridInput);
+                                            const isValidPuzzle = sol && customGridInput.some(row => row.some(v => v !== 0));
+
+                                            if (!isValidPuzzle) {
+                                                return (
+                                                    <div class="aspect-square max-w-xs mx-auto flex flex-col items-center justify-center border border-slate-700/50 rounded-xl bg-slate-950/50 text-slate-400 text-xs p-6 text-center space-y-2">
+                                                        <i class="fa-solid fa-puzzle-piece text-3xl text-slate-600"></i>
+                                                        <p>請上傳圖片或在左側輸入題目數字，解答將在此處即時呈現。</p>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <div class="grid grid-cols-9 gap-[1px] bg-slate-700 p-1 rounded-xl border border-slate-700 aspect-square max-w-xs mx-auto">
+                                                    {sol.map((row, r) =>
+                                                        row.map((val, c) => {
+                                                            const isGiven = customGridInput[r][c] !== 0;
+                                                            return (
+                                                                <div
+                                                                    key={`sol-${r}-${c}`}
+                                                                    class={`sudoku-cell flex items-center justify-center text-base font-bold bg-slate-900 ${
+                                                                        c % 3 === 2 && c !== 8 ? 'border-r-thick' : ''
+                                                                    } ${r % 3 === 2 && r !== 8 ? 'border-b-thick' : ''}`}
+                                                                >
+                                                                    <span class={isGiven ? 'text-slate-100 font-extrabold' : 'text-rose-500 font-black drop-shadow-[0_0_6px_rgba(244,63,94,0.6)]'}>
+                                                                        {val}
+                                                                    </span>
+                                                                </div>
+                                                            );
+                                                        })
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        <div class="text-center">
+                                            <button
+                                                onClick={() => {
+                                                    applyCustomPuzzle();
+                                                    setActiveTab('steps');
+                                                }}
+                                                class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs text-white font-bold shadow-lg shadow-indigo-600/30 transition"
+                                            >
+                                                <i class="fa-solid fa-brain mr-1.5"></i>查看完整步驟詳細推理
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Footer */}
+                    <footer class="border-t border-slate-800 bg-slate-950 py-4 text-center text-xs text-slate-500">
+                        智數 Sudoku Master &copy; 2026 - 結合邏輯推導與 Gemini AI 圖片辨識解題
+                    </footer>
+                </div>
+            );
+        }
+
+        // Render React Application
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
